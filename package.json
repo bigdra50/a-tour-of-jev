@@ -10,7 +10,9 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "check": "bun run typecheck && bun run lint && bun test"
+    "secretlint": "secretlint \"**/*\"",
+    "check": "bun run typecheck && bun run lint && bun run secretlint && bun test",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.87",
@@ -31,9 +33,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
+    "@secretlint/secretlint-rule-pattern": "^13.0.5",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
     "@types/bun": "^1.4.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "secretlint": "^13.0.5",
     "typescript": "^7.0.2"
   }
 }

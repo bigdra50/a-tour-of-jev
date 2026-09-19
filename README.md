@@ -49,9 +49,13 @@ bun run dev                  # http://localhost:8765
 ## 開発
 
 ```bash
-bun run check   # 型検査 + Biome + テスト
-bun test        # テストだけ
+bun run check        # 型検査 + Biome + secretlint + テスト
+bun test             # テストだけ
+bun run secretlint   # キーの混入検査だけ
 ```
+
+`bun install` すると `.githooks/pre-commit` が有効になり、コミットするファイルを secretlint で検査します。
+推奨ルールに含まれる Vercel AI Gateway のキーに加え、TypeSafe のキー（`apikey_` で始まる）も検出します。
 
 | 場所 | 中身 |
 | --- | --- |

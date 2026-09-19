@@ -1,0 +1,13 @@
+#!/bin/sh
+# コミットに入るファイルだけを secretlint で検査する。
+# .gitignore にあるファイルも git add -f で入りうるので、--no-gitignore で必ず検査する。
+set -eu
+
+secretlint=./node_modules/.bin/secretlint
+if [ ! -x "$secretlint" ]; then
+  echo "secretlint が見つかりません。bun install を実行してください" >&2
+  exit 1
+fi
+
+[ -n "$(git diff --cached --name-only --diff-filter=ACMR)" ] || exit 0
+git diff --cached --name-only --diff-filter=ACMR -z | xargs -0 "$secretlint" --no-glob --no-gitignore
