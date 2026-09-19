@@ -32,7 +32,48 @@ const request = {
   questions: { is_urgent: { type: "noul" as const, instructions: "Does this convey urgency?" } },
 };
 
+/** 応答を返さず、中断されたときだけ失敗する fetch。上流が固まった状態を再現する。 */
+function hangingFetch() {
+  let attempts = 0;
+  const fetch = (_url: string | URL | Request, init?: RequestInit) => {
+    attempts += 1;
+    return new Promise<Response>((_, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+    });
+  };
+  return { fetch: fetch as typeof globalThis.fetch, attempts: () => attempts };
+}
+
 describe("createTypeSafeProvider", () => {
+  test("応答が来なければ 1 回の試行を timeoutMs で打ち切って再試行し、最後は 504 を返す", async () => {
+    const { fetch, attempts } = hangingFetch();
+    const provider = createTypeSafeProvider({
+      apiKey: "k",
+      fetch,
+      timeoutMs: 20,
+      maxRetries: 1,
+      sleep: async () => {},
+    });
+
+    const failure = (await provider.evaluate(request))._unsafeUnwrapErr();
+    expect(attempts()).toBe(2);
+    expect(failure.status).toBe(504);
+    expect(failure.message.en).toContain("did not respond within");
+    expect(failure.message.ja).toContain("応答しませんでした");
+  });
+
+  test("呼び出し側が中断したときは再試行せず、中断として返す", async () => {
+    const { fetch, attempts } = hangingFetch();
+    const provider = createTypeSafeProvider({ apiKey: "k", fetch, timeoutMs: 1_000, sleep: async () => {} });
+    const controller = new AbortController();
+
+    const pending = provider.evaluate(request, { signal: controller.signal });
+    controller.abort();
+    const failure = (await pending)._unsafeUnwrapErr();
+    expect(failure.status).toBe(499);
+    expect(attempts()).toBe(1);
+  });
+
   test("公式 HTTP API の形で POST し、応答をそのまま返す", async () => {
     const { fetch, calls } = stubFetch([() => json(200, okBody)]);
     const provider = createTypeSafeProvider({ apiKey: "ts_secret", fetch });

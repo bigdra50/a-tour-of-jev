@@ -16,6 +16,8 @@ export const TYPESAFE_MODELS: readonly string[] = ["jev-latest", "jev-preview", 
 const RETRYABLE_STATUSES = new Set([429, 503, 529]);
 const BASE_BACKOFF_MS = 500;
 const MAX_RETRY_AFTER_MS = 10_000;
+// 普段は 1 秒前後で返る。接続が固まったまま待ち続けないよう、1 回の試行はこの長さで打ち切って再試行する
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 export interface TypeSafeProviderOptions {
   readonly apiKey: string;
@@ -23,6 +25,8 @@ export interface TypeSafeProviderOptions {
   readonly fetch?: typeof globalThis.fetch;
   /** 再試行の回数（初回を含まない）。 */
   readonly maxRetries?: number;
+  /** 1 回の試行を打ち切るまでのミリ秒。 */
+  readonly timeoutMs?: number;
   readonly sleep?: (ms: number) => Promise<void>;
 }
 
@@ -67,12 +71,29 @@ type Attempt =
   | { readonly kind: "done"; readonly result: Result<SystemOneResponse, UpstreamFailure> }
   | { readonly kind: "retry"; readonly failure: UpstreamFailure; readonly response?: Response };
 
-async function attemptOnce(fetchImpl: typeof globalThis.fetch, url: string, init: RequestInit): Promise<Attempt> {
+async function attemptOnce(
+  fetchImpl: typeof globalThis.fetch,
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Attempt> {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
   let response: Response;
   try {
-    response = await fetchImpl(url, init);
+    response = await fetchImpl(url, { ...init, signal });
   } catch (error) {
     if (init.signal?.aborted) return { kind: "done", result: err(abortedFailure()) };
+    if (timeout.aborted) {
+      const seconds = timeoutMs / 1000;
+      return {
+        kind: "retry",
+        failure: upstreamFailure(504, {
+          ja: `TypeSafe API が ${seconds} 秒以内に応答しませんでした`,
+          en: `The TypeSafe API did not respond within ${seconds} seconds`,
+        }),
+      };
+    }
     const reason = error instanceof Error ? error.message : String(error);
     return {
       kind: "retry",
@@ -110,6 +131,7 @@ export function createTypeSafeProvider(options: TypeSafeProviderOptions): JevPro
   const baseURL = (options.baseURL ?? TYPESAFE_BASE_URL).replace(/\/+$/, "");
   const fetchImpl = options.fetch ?? globalThis.fetch;
   const maxRetries = options.maxRetries ?? 2;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const sleep = options.sleep ?? defaultSleep;
   const url = `${baseURL}/v1/systemone`;
 
@@ -140,7 +162,7 @@ export function createTypeSafeProvider(options: TypeSafeProviderOptions): JevPro
       en: "The TypeSafe API call failed",
     });
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const outcome = await attemptOnce(fetchImpl, url, init);
+      const outcome = await attemptOnce(fetchImpl, url, init, timeoutMs);
       if (outcome.kind === "done") return outcome.result.map((response) => ({ response, upstream, notes: [] }));
       failure = outcome.failure;
       if (attempt < maxRetries) await sleep(retryDelayMs(outcome.response, attempt));
