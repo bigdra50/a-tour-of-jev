@@ -4,20 +4,19 @@ import type { CheckResult } from "../lessons/types.ts";
 import { currentModKey } from "../lib/platform.ts";
 import type { RunItem, RunRecord } from "../runner/record.ts";
 import { CallCard } from "./CallCard.tsx";
+import { useI18n } from "./i18n.tsx";
 import { ValueView } from "./ValueView.tsx";
 
 // 呼び出しがこれより多い実行は、1 件ずつを 1 行に畳んで表示する
 const COLLAPSE_AFTER = 3;
 
 export function Output({ run, check }: { run: RunRecord | undefined; check: CheckResult | undefined }) {
+  const { lang, t } = useI18n();
   if (!run) {
     return (
       <div className="output output-empty">
-        <p>実行すると、ここに答えが並びます。</p>
-        <p className="output-hint">
-          <kbd>{currentModKey()}</kbd>
-          <kbd>Enter</kbd> でも実行できます。
-        </p>
+        <p>{t.outputEmpty}</p>
+        <p className="output-hint">{t.outputEmptyHint(currentModKey())}</p>
       </div>
     );
   }
@@ -47,13 +46,13 @@ export function Output({ run, check }: { run: RunRecord | undefined; check: Chec
     <div className="output" aria-live="polite">
       {run.items.map(renderItem)}
 
-      {run.status === "running" && <p className="run-status">実行中…</p>}
+      {run.status === "running" && <p className="run-status">{t.running}</p>}
 
       {run.status === "failed" && run.error && (
         <div className="run-error" role="alert">
           <p className="run-error-title">
-            {run.error.kind === "syntax" ? "構文エラー" : "実行時エラー"}
-            {run.error.line !== undefined && `（${run.error.line} 行目）`}
+            {run.error.kind === "syntax" ? t.syntaxError : t.runtimeError}
+            {run.error.line !== undefined && t.atLine(run.error.line)}
           </p>
           <pre className="run-error-message">{run.error.message}</pre>
         </div>
@@ -61,20 +60,20 @@ export function Output({ run, check }: { run: RunRecord | undefined; check: Chec
 
       {run.status === "stopped" && (
         <p className="run-stopped" role="status">
-          {run.stopReason === "timeout" ? "2 分を超えたので止めました。" : "実行を止めました。"}
+          {run.stopReason === "timeout" ? t.stoppedByTimeout : t.stoppedByUser}
         </p>
       )}
 
-      {run.status === "done" && run.returned !== undefined && <ValueView value={run.returned} label="戻り値" />}
+      {run.status === "done" && run.returned !== undefined && <ValueView value={run.returned} label={t.returnValue} />}
 
       {run.status === "done" && run.items.length === 0 && run.returned === undefined && (
-        <p className="run-status">何も出力せずに終わりました。print() や show() で値を出してみましょう。</p>
+        <p className="run-status">{t.noOutput}</p>
       )}
 
       {check && run.status !== "running" && (
         <p className={check.pass ? "check check-pass" : "check check-fail"} role="status">
-          <span className="check-label">{check.pass ? "課題クリア" : "課題"}</span>
-          {check.message}
+          <span className="check-label">{check.pass ? t.exerciseCleared : t.exercise}</span>
+          {check.message[lang]}
         </p>
       )}
     </div>

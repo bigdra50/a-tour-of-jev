@@ -4,6 +4,7 @@ import type { CheckResult, Lesson } from "../lessons/types.ts";
 import { currentModKey } from "../lib/platform.ts";
 import type { RunRecord } from "../runner/record.ts";
 import { Editor } from "./Editor.tsx";
+import { useI18n } from "./i18n.tsx";
 import { Output } from "./Output.tsx";
 
 export function Lab({
@@ -29,29 +30,27 @@ export function Lab({
   onStop: () => void;
   onReset: () => void;
 }) {
-  const edited = code !== lesson.code;
+  const { lang, t } = useI18n();
+  const edited = code !== lesson.code[lang];
   return (
-    <section className="lab" aria-label="コードと実行結果">
+    <section className="lab" aria-label={t.lab}>
       <div className="lab-toolbar">
         {running ? (
           <button type="button" className="button button-stop" onClick={onStop}>
-            止める
+            {t.stop}
           </button>
         ) : (
           <button type="button" className="button button-run" onClick={onRun}>
-            実行
+            {t.run}
           </button>
         )}
         <button type="button" className="button button-quiet" onClick={onReset} disabled={!edited || running}>
-          初期コードに戻す
+          {t.resetCode}
         </button>
-        <p className="lab-hint">
-          <kbd>{currentModKey()}</kbd>
-          <kbd>Enter</kbd> で実行。<kbd>Esc</kbd> の後 <kbd>Tab</kbd> でエディタから出られます
-        </p>
+        <p className="lab-hint">{t.keyboardHint(currentModKey())}</p>
       </div>
       <div className="lab-editor">
-        <Editor key={editorKey} initial={code} onChange={onChange} onRun={onRun} label={`${lesson.title} のコード`} />
+        <Editor key={editorKey} initial={code} onChange={onChange} onRun={onRun} label={t.codeOf(lesson.title[lang])} />
       </div>
       <div className="lab-output">
         <Output run={run} check={check} />

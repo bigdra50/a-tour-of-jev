@@ -1,9 +1,14 @@
 import { evaluatedCalls, fail, notRunYet, pass, round2 } from "./checks.ts";
-import aiSdkCode from "./code/ai-sdk.js" with { type: "text" };
-import jaggednessCode from "./code/jaggedness.js" with { type: "text" };
-import japaneseCode from "./code/japanese.js" with { type: "text" };
-import vsLlmCode from "./code/vs-llm.js" with { type: "text" };
-import withLlmCode from "./code/with-llm.js" with { type: "text" };
+import aiSdkEn from "./code/en/ai-sdk.js" with { type: "text" };
+import jaggednessEn from "./code/en/jaggedness.js" with { type: "text" };
+import japaneseEn from "./code/en/japanese.js" with { type: "text" };
+import vsLlmEn from "./code/en/vs-llm.js" with { type: "text" };
+import withLlmEn from "./code/en/with-llm.js" with { type: "text" };
+import aiSdkJa from "./code/ja/ai-sdk.js" with { type: "text" };
+import jaggednessJa from "./code/ja/jaggedness.js" with { type: "text" };
+import japaneseJa from "./code/ja/japanese.js" with { type: "text" };
+import vsLlmJa from "./code/ja/vs-llm.js" with { type: "text" };
+import withLlmJa from "./code/ja/with-llm.js" with { type: "text" };
 import { type Lesson, lessonId } from "./types.ts";
 
 const DOCS = "https://docs.typesafe.ai";
@@ -12,9 +17,13 @@ export const limits: readonly Lesson[] = [
   {
     id: lessonId("jaggedness"),
     part: "limits",
-    title: "苦手なこと",
-    lead: "数える・計算する・日付を比べる・文章を書く。苦手なことはコードや別のモデルに任せる。",
-    body: `
+    title: { ja: "苦手なこと", en: "What Jev is bad at" },
+    lead: {
+      ja: "数える・計算する・日付を比べる・文章を書く。苦手なことはコードや別のモデルに任せる。",
+      en: "Counting, calculating, comparing dates, and writing text. Leave what Jev is bad at to code or another model.",
+    },
+    body: {
+      ja: `
 TypeSafe は、jev-1.13 が苦手なことを jaggedness（能力のでこぼこ）として公開しています。
 
 | 苦手なこと | 代わりにすること |
@@ -45,7 +54,39 @@ Jev は文章を生成しません。
 日付なら、月（12 択）や日（31 択）のような小さな Choice にして、「書かれていない」という選択肢も用意します。
 組み立てと比較はコードで行います。
 `,
-    code: jaggednessCode,
+      en: `
+TypeSafe publishes what jev-1.13 is bad at as its jaggedness (the unevenness of its abilities).
+
+| What it is bad at | What to do instead |
+| --- | --- |
+| Reads only what is literally written | State conditions precisely and put borderline examples in criteria |
+| Arithmetic and counting | Do arithmetic in code. To count, ask about each item and add them up in code |
+| The order of dates and the gaps between them | Extract the year, month, and day with Choice, and compare them in code |
+| Multi-hop references and double negatives | Reduce the hops and point to places in the state by name |
+| A state full of unrelated information | Narrow it down before passing it in |
+| Inputs designed to mislead | Write clear criteria and test borderline cases in advance |
+| Mismatch between instructions and criteria | Use the same words in both |
+| Structural relationships (such as probabilities adding up) | Ask each judgment in one way only, and enforce relationships in code |
+| Writing text | Use a generative model |
+
+## Counting
+
+jev-1.13 cannot reliably count the letters in a word or the entries in a list.
+It only recognizes the "shape" of the answer, and the larger the target, the larger the error.
+If a regular expression or a parser can find it, you do not need a model at all.
+To count the things that match a condition, ask one question per candidate and add them up in code.
+
+The code on the right compares both approaches with the fruit example from the documentation.
+
+## Turn extraction into "choosing"
+
+Jev does not generate text.
+To pull out a value, create candidates with a regular expression or a generative model, and have Jev choose the right one among them.
+For dates, use small Choices such as the month (12 options) or the day (31 options), and include a "not stated" option.
+Do the assembling and comparing in code.
+`,
+    },
+    code: { ja: jaggednessJa, en: jaggednessEn },
     docs: [
       { title: "Jev 1.13 jaggedness", url: `${DOCS}/model-jaggedness/jev-1.13` },
       { title: "Date extraction (cookbook)", url: `${DOCS}/cookbooks/date_extraction_cookbook` },
@@ -58,9 +99,13 @@ Jev は文章を生成しません。
   {
     id: lessonId("japanese"),
     part: "limits",
-    title: "日本語で使う",
-    lead: "Jev の主な学習言語は英語。日本語も読めるが精度は下がるので、自分のデータで確かめる。",
-    body: `
+    title: { ja: "日本語で使う", en: "Using Japanese" },
+    lead: {
+      ja: "Jev の主な学習言語は英語。日本語も読めるが精度は下がるので、自分のデータで確かめる。",
+      en: "Jev's main training language is English. It also reads Japanese, but less accurately, so test it on your own data.",
+    },
+    body: {
+      ja: `
 ドキュメントの Models のページには、次のように書かれています。
 
 - 主な学習言語は英語で、精度がいちばん高いのも英語
@@ -81,16 +126,42 @@ Jev は文章を生成しません。
 
 業務で日本語の入力に使う前に、正解ラベルのついた日本語データで正答率を測っておくと安心です。
 `,
-    code: japaneseCode,
+      en: `
+The documentation's Models page says the following.
+
+- The main training language is English, and English is also where accuracy is highest
+- CJK (Chinese, Japanese, and Korean), including Japanese, is supported, but not at the same accuracy as English
+- If you use a language other than English, test it on your own content before relying on it. When routing, watch confidence closely
+
+## How to compare
+
+The code on the right evaluates the same support ticket in three combinations, using Japanese as the non-English language.
+
+- English state and English questions
+- Japanese state and Japanese questions
+- Japanese state, with only the questions (instructions and criteria) in English
+
+Compare not only the chosen option but also \`confidence\`, the probability distribution, and the number of input tokens.
+A simple example may show no difference.
+The difference is easier to see with a message that could go either way (for example, a shipment is late and the customer is also considering a refund).
+
+Before you use Jev on Japanese input in real work, measure its accuracy on Japanese data with known correct labels.
+`,
+    },
+    code: { ja: japaneseJa, en: japaneseEn },
     docs: [{ title: "Models: language support", url: `${DOCS}/models#language-support` }],
   },
   {
     id: lessonId("vs-llm"),
     part: "limits",
-    title: "小型 LLM と比べる",
-    lead: "同じ質問を小型 LLM にも答えさせ、速さ・費用・答えの形を比べる。",
+    title: { ja: "小型 LLM と比べる", en: "Comparing with a small LLM" },
+    lead: {
+      ja: "同じ質問を小型 LLM にも答えさせ、速さ・費用・答えの形を比べる。",
+      en: "Have a small LLM answer the same questions, and compare speed, cost, and the shape of the answers.",
+    },
     requires: "llm",
-    body: `
+    body: {
+      ja: `
 Vercel の AI SDK には、Jev と同じ形の質問（choice・score・boolean）を LLM に答えさせる仕組みがあります。
 右のコードの \`llm.evaluate()\` はそれを使い、Vercel AI Gateway 経由で小型 LLM を呼びます。
 
@@ -116,31 +187,77 @@ Vercel の AI SDK には、Jev と同じ形の質問（choice・score・boolean�
 比べる LLM はコードの \`LLM_MODEL\` で変えられます。
 \`llm.evaluate()\` で \`model\` を省略すると、画面上部の「比べる LLM」で選んだモデルを使います。
 `,
-    code: vsLlmCode,
+      en: `
+Vercel's AI SDK can have an LLM answer questions in the same shape as Jev's (choice, score, boolean).
+\`llm.evaluate()\` in the code on the right uses it to call a small LLM through Vercel AI Gateway.
+
+## What is different
+
+| Aspect | Jev | LLM (the AI SDK's evaluation adapter) |
+| --- | --- | --- |
+| Choice and Score answers | The chosen answer + the probability of every option + confidence | Only the chosen answer (no distribution) |
+| Noul value | A probability trained with calibration as a goal | A number it gives when asked to "estimate a probability". Calibration is not guaranteed |
+| How questions are handled | Each question is evaluated independently and in parallel | All questions are answered in a single prompt |
+| Output tokens | Free | Billed |
+
+Calibration means that, of all the answers given as 0.8, about 80% turn out to be right.
+The documentation says this property matters when you set thresholds.
+
+## What to look at
+
+- Compare "ms", "cost USD", and "output tokens" in the table
+- Open "View JSON" in the output to see the prompt actually sent to the LLM. Questions are replaced with internal codes like \`q0\`, and options with codes like \`c0\`
+- Run it several times and compare how the answers vary (the earlier lesson "Asking the same question again")
+
+This lesson needs a Vercel AI Gateway key (\`AI_GATEWAY_API_KEY\`).
+You can change the LLM to compare with \`LLM_MODEL\` in the code.
+If you omit \`model\` in \`llm.evaluate()\`, it uses the model selected in "Comparison LLM" at the top of the screen.
+`,
+    },
+    code: { ja: vsLlmJa, en: vsLlmEn },
     exercise: {
-      goal: "Jev と LLM をそれぞれ 5 回以上呼んで、`refund_requested` のばらつき（標準偏差）を比べましょう。",
-      hint: "`Promise.all` で 5 回ずつ呼び、`stdev()` で標準偏差を出します。",
+      goal: {
+        ja: "Jev と LLM をそれぞれ 5 回以上呼んで、`refund_requested` のばらつき（標準偏差）を比べましょう。",
+        en: "Call Jev and the LLM at least 5 times each, and compare how much `refund_requested` varies (its standard deviation).",
+      },
+      hint: {
+        ja: "`Promise.all` で 5 回ずつ呼び、`stdev()` で標準偏差を出します。",
+        en: "Call each one 5 times with `Promise.all`, and compute the standard deviation with `stdev()`.",
+      },
       check: (run) => {
         const jevCount = evaluatedCalls(run, "jev").length;
         const llmCount = evaluatedCalls(run, "llm-evaluate").length;
         if (jevCount + llmCount === 0) return notRunYet;
         return jevCount >= 5 && llmCount >= 5
-          ? pass(`Jev ${jevCount} 回、LLM ${llmCount} 回。標準偏差を比べてみましょう`)
-          : fail(`今は Jev ${jevCount} 回、LLM ${llmCount} 回です`);
+          ? pass({
+              ja: `Jev ${jevCount} 回、LLM ${llmCount} 回。標準偏差を比べてみましょう`,
+              en: `Jev ${jevCount} times, LLM ${llmCount} times. Now compare the standard deviations.`,
+            })
+          : fail({
+              ja: `今は Jev ${jevCount} 回、LLM ${llmCount} 回です`,
+              en: `So far: Jev ${jevCount} times, LLM ${llmCount} times.`,
+            });
       },
     },
     docs: [
       { title: "AI SDK: Evaluation", url: "https://ai-sdk.dev/docs/ai-sdk-core/evaluation" },
-      { title: "AI primer（RLCD と較正）", url: `${DOCS}/introduction/machine-learning-primer` },
+      {
+        title: { ja: "AI primer（RLCD と較正）", en: "AI primer (RLCD and calibration)" },
+        url: `${DOCS}/introduction/machine-learning-primer`,
+      },
     ],
   },
   {
     id: lessonId("with-llm"),
     part: "limits",
-    title: "LLM と組み合わせる",
-    lead: "Jev が速く安く振り分けと検査を受け持ち、文章が要るところだけ LLM を呼ぶ。",
+    title: { ja: "LLM と組み合わせる", en: "Combining with an LLM" },
+    lead: {
+      ja: "Jev が速く安く振り分けと検査を受け持ち、文章が要るところだけ LLM を呼ぶ。",
+      en: "Let Jev handle routing and checking quickly and cheaply, and call an LLM only where you need text.",
+    },
     requires: "llm",
-    body: `
+    body: {
+      ja: `
 Jev は判断だけを返し、文章は書きません。
 文章を書く必要があるなら LLM と組み合わせます。
 
@@ -169,17 +286,60 @@ Jev は判断だけを返し、文章は書きません。
 右のコードは、振り分け（Jev）→ 返信文の生成（LLM）→ 返信の検査（Jev）の 3 段です。
 出力の「ミリ秒」で、どの段に時間がかかっているかを見てください。
 `,
-    code: withLlmCode,
+      en: `
+Jev returns only judgments and does not write text.
+When you need text written, combine it with an LLM.
+
+| Role | Good for |
+| --- | --- |
+| Jev | Classification, scoring, yes/no. Probabilities and confidence. Most requests take about 100 ms |
+| LLM | Writing replies and summaries, free-form extraction, multi-step reasoning |
+
+## Combinations from the documentation
+
+- **Intent routing**: Jev classifies a request and decides whether it goes to fixed logic, a specialized LLM, or a person. Use expensive LLMs only for the requests that need them
+- **Guardrails**: check what goes into an LLM and what comes out of it with Jev Nouls (jailbreaks, dangerous requests, policy violations, and so on)
+- **Extraction cascade**: extract with a small LLM, have Jev check each field for "does this look wrong?", and send only the suspicious ones to a large reasoning model
+- **Choosing from candidates**: a regular expression or an LLM produces candidates, and Jev picks the right one
+- **Smart home demo**: a Noul decides whether a request contains several actions, and if it does, an LLM splits it into single actions before Jev evaluates them. Small talk is left to the LLM
+
+## Should you combine Jev with a small LLM?
+
+Yes, if you need to generate text.
+If judgments are all you need, Jev alone is enough.
+There are two basic patterns.
+
+- Check what an LLM produces with Jev
+- When Jev's confidence is low, hand off to an LLM or a person
+
+The code on the right has three stages: routing (Jev) → writing a reply (LLM) → checking the reply (Jev).
+Look at "ms" in the output to see which stage takes the time.
+`,
+    },
+    code: { ja: withLlmJa, en: withLlmEn },
     exercise: {
-      goal: '検査の `reply` に規約違反の文（例: "We will refund you $500 right away."）を直接入れて、`breaks_policy` が 0.5 を超えるか確かめましょう。',
-      hint: "`reply: draft.text` を、規約違反の文字列に置き換えます。",
+      goal: {
+        ja: '検査の `reply` に規約違反の文（例: "We will refund you $500 right away."）を直接入れて、`breaks_policy` が 0.5 を超えるか確かめましょう。',
+        en: 'Put a sentence that breaks the policy (for example, "We will refund you $500 right away.") directly into `reply` in the check, and see whether `breaks_policy` goes above 0.5.',
+      },
+      hint: {
+        ja: "`reply: draft.text` を、規約違反の文字列に置き換えます。",
+        en: "Replace `reply: draft.text` with a string that breaks the policy.",
+      },
       check: (run) => {
         const call = evaluatedCalls(run).findLast((c) => "breaks_policy" in c.answers);
         const answer = call?.answers.breaks_policy;
         if (answer?.type !== "noul") return notRunYet;
+        const value = round2(answer.noul);
         return answer.noul > 0.5
-          ? pass(`breaks_policy = ${round2(answer.noul)}。規約違反を検出しました`)
-          : fail(`breaks_policy = ${round2(answer.noul)}。もっとはっきり規約に反する文にしてみましょう`);
+          ? pass({
+              ja: `breaks_policy = ${value}。規約違反を検出しました`,
+              en: `breaks_policy = ${value}. The policy violation was detected.`,
+            })
+          : fail({
+              ja: `breaks_policy = ${value}。もっとはっきり規約に反する文にしてみましょう`,
+              en: `breaks_policy = ${value}. Try a sentence that breaks the policy more clearly.`,
+            });
       },
     },
     docs: [
@@ -192,9 +352,13 @@ Jev は判断だけを返し、文章は書きません。
   {
     id: lessonId("ai-sdk"),
     part: "limits",
-    title: "AI SDK と Gateway から使う",
-    lead: "同じ Jev を Vercel AI Gateway 経由でも呼べる。名前と値の置き場所が少し違う。",
-    body: `
+    title: { ja: "AI SDK と Gateway から使う", en: "Using the AI SDK and Gateway" },
+    lead: {
+      ja: "同じ Jev を Vercel AI Gateway 経由でも呼べる。名前と値の置き場所が少し違う。",
+      en: "You can call the same Jev through Vercel AI Gateway. A few names differ, and some values live in different places.",
+    },
+    body: {
+      ja: `
 Jev は Vercel AI Gateway からも使えます。
 AI SDK 7 では \`experimental_evaluate\` を使い、モデル ID は \`typesafe-ai/jev\`、認証は \`AI_GATEWAY_API_KEY\` です。
 
@@ -238,7 +402,52 @@ result.providerMetadata?.typesafe?.confidence; // Choice と Score の confidenc
 出力の「JSON を見る」で、上流に送った質問が \`boolean\` になっていることを確かめられます。
 \`experimental_evaluate\` はまだ実験的な API で、パッチリリースでも変わることがあります。
 `,
-    code: aiSdkCode,
+      en: `
+Jev is also available through Vercel AI Gateway.
+In AI SDK 7, use \`experimental_evaluate\` with the model ID \`typesafe-ai/jev\`, and authenticate with \`AI_GATEWAY_API_KEY\`.
+
+\`\`\`ts
+import { experimental_evaluate } from "ai";
+
+const result = await experimental_evaluate({
+  model: "typesafe-ai/jev",
+  state: "Help! My payouts have been failing for 3 days.",
+  questions: {
+    is_urgent: { type: "boolean", instructions: "Does this message convey urgency?" },
+  },
+});
+
+result.answers.is_urgent.probability; // the noul of the TypeSafe API
+result.providerMetadata?.typesafe?.confidence; // confidence of Choice and Score (per question ID)
+\`\`\`
+
+## Name mapping
+
+| TypeSafe API | AI SDK |
+| --- | --- |
+| \`type: "noul"\` | \`type: "boolean"\` |
+| \`noul\` in the answer | \`probability\` in the answer |
+| \`confidence\` in the answer | \`providerMetadata.typesafe.confidence[questionId]\` |
+| \`legend\` in the answer | None (look it up in your criteria yourself) |
+| \`usage.input_tokens\` | \`usage.inputTokens\` |
+| Model \`jev-latest\` | \`typesafe-ai/jev\` |
+
+## Watch the environment variable names
+
+| How you call it | Environment variable it reads |
+| --- | --- |
+| Official SDKs (\`@typesafe-ai/sdk\`, \`typesafe-sdk\`) | \`TYPESAFE_API_KEY\` |
+| The AI SDK's TypeSafe provider (\`@ai-sdk/typesafe-ai\`) | \`TYPESAFE_AI_API_KEY\` |
+| The AI SDK through the Gateway | \`AI_GATEWAY_API_KEY\` (starts with \`vck_\`) |
+
+## Switching in this tutorial
+
+Set "Route" at the top of the screen to Vercel AI Gateway, and \`jev()\` goes through the Gateway.
+Open "View JSON" in the output to confirm that the questions sent upstream became \`boolean\`.
+\`experimental_evaluate\` is still an experimental API and can change even in a patch release.
+`,
+    },
+    code: { ja: aiSdkJa, en: aiSdkEn },
     docs: [
       { title: "AI SDK: experimental_evaluate", url: "https://ai-sdk.dev/docs/reference/ai-sdk-core/evaluate" },
       {

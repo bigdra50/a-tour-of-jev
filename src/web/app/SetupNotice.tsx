@@ -1,16 +1,16 @@
 // API キーが無いとき・サーバーに届かないときの案内。
 
 import type { StatusResponse } from "../../contract/jev.ts";
+import { useI18n } from "./i18n.tsx";
 
 export function SetupNotice({ status, error }: { status: StatusResponse | undefined; error: string | undefined }) {
+  const { t } = useI18n();
   if (error) {
     return (
       <section className="notice notice-error" role="alert">
-        <h2 className="notice-title">この教材のサーバーに届きません</h2>
+        <h2 className="notice-title">{t.serverUnreachable}</h2>
         <p>{error}</p>
-        <p>
-          ターミナルで <code>bun run dev</code> が動いているか確認して、このページを再読み込みしてください。
-        </p>
+        <p>{t.serverUnreachableHelp}</p>
       </section>
     );
   }
@@ -23,20 +23,14 @@ export function SetupNotice({ status, error }: { status: StatusResponse | undefi
     <section className={noKeys ? "notice notice-error" : "notice"} role={noKeys ? "alert" : "note"}>
       {noKeys && (
         <>
-          <h2 className="notice-title">API キーが設定されていません</h2>
+          <h2 className="notice-title">{t.noKeysTitle}</h2>
           <ol>
-            <li>
-              <code>cp .env.example .env.local</code> を実行する
-            </li>
-            <li>
-              <code>.env.local</code> に <code>TYPESAFE_API_KEY</code> か <code>AI_GATEWAY_API_KEY</code>（
-              <code>vck_</code> で始まる）を書く
-            </li>
-            <li>
-              サーバーを止めて <code>bun run dev</code> で起動し直す
-            </li>
+            {t.noKeysSteps.map((step, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: 手順は固定の並びで、並べ替えもしない
+              <li key={index}>{step}</li>
+            ))}
           </ol>
-          <p>シェルで export した環境変数も読みます。キーはサーバーの中だけで使い、ブラウザには送りません。</p>
+          <p>{t.noKeysNote}</p>
         </>
       )}
       {status.notes.map((note) => (

@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { maskKey, parseEnvFile, resolveCredentials } from "../../src/server/credentials.ts";
 
-const env = (vars: Record<string, string | undefined>) => ({ origin: "環境変数", vars });
+const env = (vars: Record<string, string | undefined>) => ({
+  origin: { ja: "環境変数", en: "environment variable" },
+  vars,
+});
 const file = (vars: Record<string, string | undefined>) => ({ origin: ".env.local", vars });
 
 describe("resolveCredentials", () => {
@@ -11,9 +14,12 @@ describe("resolveCredentials", () => {
     expect(creds.gateway).toBeUndefined();
   });
 
-  test("TYPESAFE_API_KEY は TypeSafe 直のキー", () => {
+  test("TYPESAFE_API_KEY は TypeSafe API のキー", () => {
     const creds = resolveCredentials([env({ TYPESAFE_API_KEY: "ts_live_abcd" })]);
-    expect(creds.typesafe).toEqual({ key: "ts_live_abcd", from: "TYPESAFE_API_KEY（環境変数）" });
+    expect(creds.typesafe).toEqual({
+      key: "ts_live_abcd",
+      from: { ja: "TYPESAFE_API_KEY（環境変数）", en: "TYPESAFE_API_KEY (environment variable)" },
+    });
     expect(creds.gateway).toBeUndefined();
   });
 
@@ -24,15 +30,21 @@ describe("resolveCredentials", () => {
 
   test("AI_GATEWAY_API_KEY は Gateway のキー", () => {
     const creds = resolveCredentials([env({ AI_GATEWAY_API_KEY: "vck_1234" })]);
-    expect(creds.gateway).toEqual({ key: "vck_1234", from: "AI_GATEWAY_API_KEY（環境変数）" });
+    expect(creds.gateway).toEqual({
+      key: "vck_1234",
+      from: { ja: "AI_GATEWAY_API_KEY（環境変数）", en: "AI_GATEWAY_API_KEY (environment variable)" },
+    });
   });
 
   test("TYPESAFE_API_KEY に vck_ のキーが入っていれば Gateway 用に回し、注記を残す", () => {
     const creds = resolveCredentials([env({ TYPESAFE_API_KEY: "vck_secretvalue" })]);
     expect(creds.typesafe).toBeUndefined();
     expect(creds.gateway?.key).toBe("vck_secretvalue");
-    expect(creds.notes.join()).toContain("TYPESAFE_API_KEY");
-    expect(creds.notes.join()).not.toContain("secretvalue");
+    for (const lang of ["ja", "en"] as const) {
+      const notes = creds.notes.map((note) => note[lang]).join();
+      expect(notes).toContain("TYPESAFE_API_KEY");
+      expect(notes).not.toContain("secretvalue");
+    }
   });
 
   test("環境変数が .env.local の同名変数を隠していても、両方のキーを拾う", () => {
@@ -41,7 +53,10 @@ describe("resolveCredentials", () => {
       file({ TYPESAFE_API_KEY: "ts_official" }),
     ]);
     expect(creds.gateway?.key).toBe("vck_gateway");
-    expect(creds.typesafe).toEqual({ key: "ts_official", from: "TYPESAFE_API_KEY（.env.local）" });
+    expect(creds.typesafe).toEqual({
+      key: "ts_official",
+      from: { ja: "TYPESAFE_API_KEY（.env.local）", en: "TYPESAFE_API_KEY (.env.local)" },
+    });
   });
 
   test("先に渡したソースが優先される", () => {

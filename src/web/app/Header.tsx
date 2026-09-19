@@ -1,14 +1,10 @@
-// 画面上部。題字、経路とモデルの選択、このセッションの累計。
+// 画面上部。題字、経路とモデルと言語の選択、このセッションの累計。
 
 import type { ProviderId, StatusResponse } from "../../contract/jev.ts";
-import { formatCost, formatTokens } from "../lib/format.ts";
+import { LANGS, type Lang } from "../../contract/lang.ts";
+import { formatCost, formatTokens, USD_JPY } from "../lib/format.ts";
 import type { SessionTotals } from "../lib/session.ts";
-import { USD_JPY } from "./CallCard.tsx";
-
-const PROVIDER_LABEL: Readonly<Record<ProviderId, string>> = {
-  typesafe: "TypeSafe 直",
-  gateway: "Vercel AI Gateway",
-};
+import { LANG_NAMES, useI18n } from "./i18n.tsx";
 
 export interface HeaderSettings {
   readonly provider: ProviderId | null;
@@ -23,6 +19,7 @@ export function Header({
   tocOpen,
   onToggleToc,
   onChange,
+  onLangChange,
 }: {
   status: StatusResponse | undefined;
   settings: HeaderSettings;
@@ -30,7 +27,9 @@ export function Header({
   tocOpen: boolean;
   onToggleToc: () => void;
   onChange: (next: Partial<HeaderSettings>) => void;
+  onLangChange: (lang: Lang) => void;
 }) {
+  const { lang, t } = useI18n();
   const cost = formatCost(totals.costUsd, USD_JPY);
   const models = settings.provider && status ? status.jevModels[settings.provider] : [];
 
@@ -44,7 +43,7 @@ export function Header({
           aria-controls="toc-panel"
           onClick={onToggleToc}
         >
-          目次
+          {t.contents}
         </button>
         <a className="wordmark" href="#/hello">
           <span className="wordmark-tour">A Tour of</span> <span className="wordmark-jev">Jev</span>
@@ -53,29 +52,29 @@ export function Header({
 
       <div className="masthead-controls">
         <label className="control">
-          <span className="control-label">経路</span>
+          <span className="control-label">{t.route}</span>
           <select
             value={settings.provider ?? ""}
             disabled={!status}
             onChange={(e) => onChange({ provider: e.target.value as ProviderId, model: undefined })}
           >
-            {!settings.provider && <option value="">キー未設定</option>}
+            {!settings.provider && <option value="">{t.noApiKey}</option>}
             {(["typesafe", "gateway"] as const).map((id) => (
               <option key={id} value={id} disabled={!status?.providers[id].configured}>
-                {PROVIDER_LABEL[id]}
-                {status?.providers[id].configured ? "" : "（キー未設定）"}
+                {t.providers[id]}
+                {status?.providers[id].configured ? "" : t.noApiKeySuffix}
               </option>
             ))}
           </select>
         </label>
         <label className="control">
-          <span className="control-label">モデル</span>
+          <span className="control-label">{t.model}</span>
           <select
             value={settings.model ?? models[0] ?? ""}
             disabled={models.length === 0}
             onChange={(e) => onChange({ model: e.target.value })}
           >
-            {models.length === 0 && <option value="">なし</option>}
+            {models.length === 0 && <option value="">{t.noModels}</option>}
             {models.map((model) => (
               <option key={model} value={model}>
                 {model}
@@ -85,7 +84,7 @@ export function Header({
         </label>
         {status?.llmAvailable && (
           <label className="control">
-            <span className="control-label">比べる LLM</span>
+            <span className="control-label">{t.comparisonLlm}</span>
             <select value={settings.llmModel} onChange={(e) => onChange({ llmModel: e.target.value })}>
               {status.llmModels.map((model) => (
                 <option key={model.id} value={model.id}>
@@ -95,26 +94,37 @@ export function Header({
             </select>
           </label>
         )}
+        <label className="control">
+          <span className="control-label">{t.language}</span>
+          <select value={lang} onChange={(e) => onLangChange(e.target.value as Lang)}>
+            {LANGS.map((id) => (
+              <option key={id} value={id} lang={id}>
+                {LANG_NAMES[id]}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <dl className="session" title={`このブラウザのタブを開いてからの累計。円は 1 ドル = ${USD_JPY} 円の概算`}>
+      <dl className="session" title={t.totalsTitle}>
         <div>
-          <dt>呼び出し</dt>
+          <dt>{t.calls}</dt>
           <dd>
-            <span className="num">{totals.calls}</span> 回
+            <span className="num">{totals.calls}</span> {t.callsUnit}
           </dd>
         </div>
         <div>
-          <dt>入力</dt>
+          <dt>{t.input}</dt>
           <dd>
-            <span className="num">{formatTokens(totals.inputTokens)}</span> トークン
+            <span className="num">{formatTokens(totals.inputTokens)}</span> {t.tokens}
           </dd>
         </div>
         <div>
-          <dt>費用</dt>
+          <dt>{t.cost}</dt>
           <dd>
             <span className="num">{cost?.usd}</span>
-            {totals.unknownCost && "+"}（約 <span className="num">{cost?.jpy}</span>）
+            {totals.unknownCost && "+"}
+            {cost && t.approximately(<span className="num">{cost.jpy}</span>)}
           </dd>
         </div>
       </dl>

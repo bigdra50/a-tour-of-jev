@@ -8,7 +8,9 @@ import type {
   PlaygroundSystemOneResponse,
   ProviderId,
 } from "../../contract/jev.ts";
+import type { Lang } from "../../contract/lang.ts";
 import { choice, mean, noul, score, stdev } from "./helpers.ts";
+import { RUNNER_MESSAGES } from "./messages.ts";
 import type { CallError, CallKind, CallResponse, RunEvent } from "./record.ts";
 
 export interface RunSettings {
@@ -29,7 +31,7 @@ export interface Transport {
 type Obj = Record<string, unknown>;
 const isObject = (value: unknown): value is Obj => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** postMessage で送れる形にする。関数や循環参照は文字列に置き換える。 */
+/** postMessage で送れる形にする。関数や循環参照は、言語によらない Node と同じ表記の文字列に置き換える。 */
 export function toCloneable(value: unknown): unknown {
   // 祖先だけを覚える。同じオブジェクトを 2 か所から参照していても循環とはみなさない。
   const ancestors = new Set<object>();
@@ -41,11 +43,11 @@ export function toCloneable(value: unknown): unknown {
     return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
   };
   const walk = (v: unknown): unknown => {
-    if (typeof v === "function") return `[関数 ${v.name || "anonymous"}]`;
+    if (typeof v === "function") return `[Function: ${v.name || "anonymous"}]`;
     if (typeof v === "bigint") return `${v}n`;
     if (typeof v === "symbol") return v.toString();
     if (v === undefined || v === null || typeof v !== "object") return v;
-    if (ancestors.has(v)) return "[循環参照]";
+    if (ancestors.has(v)) return "[Circular]";
     ancestors.add(v);
     const result = walkObject(v);
     ancestors.delete(v);
@@ -77,7 +79,13 @@ export interface Runtime {
   whenIdle(): Promise<void>;
 }
 
-export function createRuntime(transport: Transport, emit: (event: RunEvent) => void, settings: RunSettings): Runtime {
+export function createRuntime(
+  transport: Transport,
+  emit: (event: RunEvent) => void,
+  settings: RunSettings,
+  lang: Lang,
+): Runtime {
+  const text = RUNNER_MESSAGES[lang];
   let nextId = 1;
   const inFlight = new Set<Promise<unknown>>();
 
@@ -104,7 +112,7 @@ export function createRuntime(transport: Transport, emit: (event: RunEvent) => v
   }
 
   function jev(request: unknown) {
-    if (!isObject(request)) throw new TypeError("jev() には { state, questions } のオブジェクトを渡してください");
+    if (!isObject(request)) throw new TypeError(text.jevArgument);
     const provider = (request.provider as ProviderId | undefined) ?? settings.provider ?? undefined;
     const model =
       (request.model as string | undefined) ?? (provider === settings.provider ? settings.model : undefined);
@@ -118,11 +126,11 @@ export function createRuntime(transport: Transport, emit: (event: RunEvent) => v
 
   const llm = Object.freeze({
     evaluate(request: unknown) {
-      if (!isObject(request)) throw new TypeError("llm.evaluate() には { state, questions } を渡してください");
+      if (!isObject(request)) throw new TypeError(text.llmEvaluateArgument);
       return call("llm-evaluate", { model: settings.llmModel, ...request }, (b) => transport.llmEvaluate(b));
     },
     generate(request: unknown) {
-      if (!isObject(request)) throw new TypeError("llm.generate() には { prompt } を渡してください");
+      if (!isObject(request)) throw new TypeError(text.llmGenerateArgument);
       return call("llm-generate", { model: settings.llmModel, ...request }, (b) => transport.llmGenerate(b));
     },
   });

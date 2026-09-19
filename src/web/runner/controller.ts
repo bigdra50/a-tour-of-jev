@@ -1,5 +1,7 @@
 // メインスレッド側。Worker を起動してイベントを実行記録にまとめ、時間切れと停止を扱う。
 
+import type { Lang } from "../../contract/lang.ts";
+import { RUNNER_MESSAGES } from "./messages.ts";
 import { emptyRun, type RunEvent, type RunRecord, reduceRun } from "./record.ts";
 import type { RunSettings } from "./scope.ts";
 
@@ -15,6 +17,7 @@ export interface RunHandle {
 export function startRun(
   code: string,
   settings: RunSettings,
+  lang: Lang,
   onUpdate: (run: RunRecord) => void,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): RunHandle {
@@ -45,11 +48,11 @@ export function startRun(
     apply({
       type: "done",
       ok: false,
-      error: { kind: "runtime", message: event.message || "実行環境でエラーが起きました" },
+      error: { kind: "runtime", message: event.message || RUNNER_MESSAGES[lang].workerCrashed },
     });
   };
   onUpdate(record);
-  worker.postMessage({ code, settings });
+  worker.postMessage({ code, settings, lang });
 
   return { stop: () => apply({ type: "stopped", reason: "user" }), done };
 }

@@ -3,6 +3,7 @@
 
 import { err, ok, type Result, ResultAsync } from "neverthrow";
 import type { SystemOneRequest, SystemOneResponse, UpstreamTrace } from "../../contract/jev.ts";
+import type { Localized } from "../../contract/lang.ts";
 import { abortedFailure, extractErrorMessage, type UpstreamFailure, upstreamFailure } from "./errors.ts";
 import type { JevProvider, JevProviderResult } from "./types.ts";
 
@@ -47,15 +48,19 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
-function describeStatus(status: number, body: unknown): string {
+function describeStatus(status: number, body: unknown): Localized {
   const detail = extractErrorMessage(body);
-  const hint =
+  const suffix = detail ? `: ${detail}` : "";
+  const hint: Localized =
     status === 401
-      ? "（API キーを確認してください）"
+      ? { ja: "（API キーを確認してください）", en: " (check your API key)" }
       : status === 429
-        ? "（レート制限。少し待ってから再実行してください）"
-        : "";
-  return `TypeSafe API が ${status} を返しました${detail ? `: ${detail}` : ""}${hint}`;
+        ? { ja: "（レート制限。少し待ってから再実行してください）", en: " (rate limited; wait a moment and run again)" }
+        : { ja: "", en: "" };
+  return {
+    ja: `TypeSafe API が ${status} を返しました${suffix}${hint.ja}`,
+    en: `TypeSafe API returned ${status}${suffix}${hint.en}`,
+  };
 }
 
 type Attempt =
@@ -69,7 +74,13 @@ async function attemptOnce(fetchImpl: typeof globalThis.fetch, url: string, init
   } catch (error) {
     if (init.signal?.aborted) return { kind: "done", result: err(abortedFailure()) };
     const reason = error instanceof Error ? error.message : String(error);
-    return { kind: "retry", failure: upstreamFailure(502, `TypeSafe API に接続できませんでした: ${reason}`) };
+    return {
+      kind: "retry",
+      failure: upstreamFailure(502, {
+        ja: `TypeSafe API に接続できませんでした: ${reason}`,
+        en: `Could not connect to the TypeSafe API: ${reason}`,
+      }),
+    };
   }
 
   const body = await readBody(response);
@@ -77,7 +88,13 @@ async function attemptOnce(fetchImpl: typeof globalThis.fetch, url: string, init
     if (typeof body !== "object" || body === null || !("answers" in body)) {
       return {
         kind: "done",
-        result: err(upstreamFailure(502, "TypeSafe API の応答に answers がありません", body)),
+        result: err(
+          upstreamFailure(
+            502,
+            { ja: "TypeSafe API の応答に answers がありません", en: "The TypeSafe API response has no answers" },
+            body,
+          ),
+        ),
       };
     }
     return { kind: "done", result: ok(body as SystemOneResponse) };
@@ -118,7 +135,10 @@ export function createTypeSafeProvider(options: TypeSafeProviderOptions): JevPro
       body,
     };
 
-    let failure = upstreamFailure(502, "TypeSafe API の呼び出しに失敗しました");
+    let failure = upstreamFailure(502, {
+      ja: "TypeSafe API の呼び出しに失敗しました",
+      en: "The TypeSafe API call failed",
+    });
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const outcome = await attemptOnce(fetchImpl, url, init);
       if (outcome.kind === "done") return outcome.result.map((response) => ({ response, upstream, notes: [] }));

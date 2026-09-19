@@ -1,7 +1,8 @@
 // 画面全体の状態をまとめる。レッスンの移動は URL の #/<id> で行う。
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ProviderId, StatusResponse } from "../../contract/jev.ts";
+import { LANGS, type Lang } from "../../contract/lang.ts";
 import { findLesson, LESSONS } from "../lessons/index.ts";
 import type { Lesson, LessonId } from "../lessons/types.ts";
 import { fetchStatus } from "../lib/api.ts";
@@ -10,6 +11,7 @@ import { load, save } from "../lib/storage.ts";
 import { type RunHandle, startRun } from "../runner/controller.ts";
 import type { RunRecord } from "../runner/record.ts";
 import { Header, type HeaderSettings } from "./Header.tsx";
+import { detectLang, I18nProvider, MESSAGES } from "./i18n.tsx";
 import { Lab } from "./Lab.tsx";
 import { LessonView } from "./LessonView.tsx";
 import { SetupNotice } from "./SetupNotice.tsx";
@@ -22,6 +24,12 @@ interface StoredSettings {
   readonly provider?: ProviderId;
   readonly model?: string;
   readonly llmModel?: string;
+}
+
+/** 保存した言語があればそれを、なければブラウザの言語設定から決める。 */
+function initialLang(): Lang {
+  const stored = load<string>("lang", "");
+  return LANGS.find((lang) => lang === stored) ?? detectLang(navigator.languages ?? [navigator.language]);
 }
 
 const lessonFromHash = (): Lesson | undefined =>
@@ -43,6 +51,7 @@ function effectiveSettings(stored: StoredSettings, status: StatusResponse | unde
 }
 
 export function App() {
+  const [lang, setLang] = useState<Lang>(initialLang);
   const [status, setStatus] = useState<StatusResponse>();
   const [statusError, setStatusError] = useState<string>();
   const [stored, setStored] = useState<StoredSettings>(() => load("settings", {}));
@@ -59,14 +68,21 @@ export function App() {
   const handle = useRef<RunHandle | null>(null);
   const lessonPane = useRef<HTMLElement>(null);
 
+  const i18n = useMemo(() => ({ lang, t: MESSAGES[lang] }), [lang]);
   const settings = effectiveSettings(stored, status);
-  const code = codes[lesson.id] ?? lesson.code;
+  const code = codes[lesson.id] ?? lesson.code[lang];
   const run = runs[lesson.id];
   const check = lesson.exercise && run && run.status !== "running" ? lesson.exercise.check(run) : undefined;
 
+  // キーの出どころと注記はサーバーが言語ごとに返すので、言語を変えたら取り直す
   useEffect(() => {
-    void fetchStatus().match(setStatus, setStatusError);
-  }, []);
+    void fetchStatus(lang).match(setStatus, setStatusError);
+  }, [lang]);
+
+  useEffect(() => {
+    save("lang", lang);
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   useEffect(() => save("settings", stored), [stored]);
   useEffect(() => save("done", [...done]), [done]);
@@ -87,16 +103,19 @@ export function App() {
     if (lessonFromHash()?.id !== lesson.id) window.history.replaceState(null, "", `#/${lesson.id}`);
     save("current", lesson.id);
     lessonPane.current?.scrollTo({ top: 0 });
-    document.title = `${lesson.title} | A Tour of Jev`;
     // 別のレッスンに移ったら、走っている実行は止める
     handle.current?.stop();
   }, [lesson]);
+
+  useEffect(() => {
+    document.title = `${lesson.title[lang]} | A Tour of Jev`;
+  }, [lesson, lang]);
 
   const runCode = useCallback(() => {
     if (handle.current) return;
     const target = lesson;
     let previous: RunRecord | undefined;
-    const started = startRun(codes[target.id] ?? target.code, settings, (record) => {
+    const started = startRun(codes[target.id] ?? target.code[lang], settings, lang, (record) => {
       const finished = newlyFinished(previous, record);
       previous = record;
       if (finished.length > 0) setTotals((current) => addFinishedCalls(current, finished));
@@ -111,7 +130,7 @@ export function App() {
       const passed = target.exercise ? target.exercise.check(record).pass : succeeded;
       if (succeeded && passed) setDone((current) => new Set(current).add(target.id));
     });
-  }, [lesson, codes, settings]);
+  }, [lesson, codes, settings, lang]);
 
   const runRef = useRef(runCode);
   runRef.current = runCode;
@@ -133,7 +152,9 @@ export function App() {
   }, []);
 
   const changeCode = (next: string) =>
-    setCodes((current) => (next === lesson.code ? without(current, lesson.id) : { ...current, [lesson.id]: next }));
+    setCodes((current) =>
+      next === lesson.code[lang] ? without(current, lesson.id) : { ...current, [lesson.id]: next },
+    );
 
   const resetCode = () => {
     setCodes((current) => without(current, lesson.id));
@@ -142,44 +163,53 @@ export function App() {
   };
 
   return (
-    <div className="app" data-toc={tocOpen ? "open" : "closed"}>
-      <Header
-        status={status}
-        settings={settings}
-        totals={totals}
-        tocOpen={tocOpen}
-        onToggleToc={() => setTocOpen((open) => !open)}
-        onChange={(next) => setStored((current) => ({ ...current, ...next }) as StoredSettings)}
-      />
-      <div className="workspace">
-        <aside id="toc-panel" className="toc-panel">
-          <Toc current={lesson.id} done={done} onNavigate={() => setTocOpen(false)} />
-        </aside>
-        <button type="button" className="toc-backdrop" aria-label="目次を閉じる" onClick={() => setTocOpen(false)} />
-        <main className="lesson-pane" ref={lessonPane}>
-          <LessonView
-            lesson={lesson}
-            done={done.has(lesson.id)}
-            check={check}
-            llmAvailable={status?.llmAvailable ?? false}
+    <I18nProvider value={i18n}>
+      <div className="app" data-toc={tocOpen ? "open" : "closed"}>
+        <Header
+          status={status}
+          settings={settings}
+          totals={totals}
+          tocOpen={tocOpen}
+          onToggleToc={() => setTocOpen((open) => !open)}
+          onChange={(next) => setStored((current) => ({ ...current, ...next }) as StoredSettings)}
+          onLangChange={setLang}
+        />
+        <div className="workspace">
+          <aside id="toc-panel" className="toc-panel">
+            <Toc current={lesson.id} done={done} onNavigate={() => setTocOpen(false)} />
+          </aside>
+          <button
+            type="button"
+            className="toc-backdrop"
+            aria-label={i18n.t.closeContents}
+            onClick={() => setTocOpen(false)}
           />
-        </main>
-        <div className="lab-pane">
-          <SetupNotice status={status} error={statusError} />
-          <Lab
-            lesson={lesson}
-            code={code}
-            editorKey={`${lesson.id}:${resets}`}
-            running={running}
-            run={run}
-            check={check}
-            onChange={changeCode}
-            onRun={runCode}
-            onStop={() => handle.current?.stop()}
-            onReset={resetCode}
-          />
+          <main className="lesson-pane" ref={lessonPane}>
+            <LessonView
+              lesson={lesson}
+              done={done.has(lesson.id)}
+              check={check}
+              llmAvailable={status?.llmAvailable ?? false}
+            />
+          </main>
+          <div className="lab-pane">
+            <SetupNotice status={status} error={statusError} />
+            <Lab
+              lesson={lesson}
+              code={code}
+              // 言語を変えたら、書き換えていないコードはその言語の初期コードに差し替える
+              editorKey={`${lesson.id}:${lang}:${resets}`}
+              running={running}
+              run={run}
+              check={check}
+              onChange={changeCode}
+              onRun={runCode}
+              onStop={() => handle.current?.stop()}
+              onReset={resetCode}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </I18nProvider>
   );
 }

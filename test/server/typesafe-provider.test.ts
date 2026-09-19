@@ -109,7 +109,8 @@ describe("createTypeSafeProvider", () => {
     expect(calls).toHaveLength(1);
     expect(failure.status).toBe(422);
     expect(failure.details).toEqual({ detail });
-    expect(failure.message).toContain("field required");
+    expect(failure.message.en).toContain("field required");
+    expect(failure.message.ja).toContain("field required");
   });
 
   test("401 はキーの確認を促すメッセージにする", async () => {
@@ -117,7 +118,8 @@ describe("createTypeSafeProvider", () => {
     const provider = createTypeSafeProvider({ apiKey: "k", fetch });
     const failure = (await provider.evaluate(request))._unsafeUnwrapErr();
     expect(failure.status).toBe(401);
-    expect(failure.message).toContain("Invalid API key");
+    expect(failure.message.en).toContain("Invalid API key");
+    expect(failure.message.ja).toContain("Invalid API key");
   });
 
   test("中断されたら 499 を返し、再試行しない", async () => {

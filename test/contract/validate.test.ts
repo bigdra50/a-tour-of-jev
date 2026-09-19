@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import type { Lang } from "../../src/contract/lang.ts";
 import {
+  type Validation,
   validateLlmEvaluateRequest,
   validateLlmGenerateRequest,
   validateSystemOneRequest,
 } from "../../src/contract/validate.ts";
+
+const issuesIn = (result: Validation<unknown>, lang: Lang = "en"): string[] =>
+  result.ok ? [] : result.issues.map((issue) => issue[lang]);
 
 const noulQ = { type: "noul" as const, instructions: "Is this urgent?" };
 
@@ -40,7 +45,7 @@ describe("validateSystemOneRequest", () => {
     for (const state of [undefined, 1, true, null]) {
       const result = validateSystemOneRequest({ state, questions: { q: noulQ } });
       expect(result.ok).toBe(false);
-      expect(!result.ok && result.issues.join()).toContain("state");
+      expect(issuesIn(result).join()).toContain("state");
     }
   });
 
@@ -48,7 +53,7 @@ describe("validateSystemOneRequest", () => {
     for (const questions of [{}, [], undefined]) {
       const result = validateSystemOneRequest({ state: "x", questions });
       expect(result.ok).toBe(false);
-      expect(!result.ok && result.issues.join()).toContain("questions");
+      expect(issuesIn(result).join()).toContain("questions");
     }
   });
 
@@ -58,7 +63,7 @@ describe("validateSystemOneRequest", () => {
       questions: { mine: { type: "boolean", instructions: "?" } },
     });
     expect(result.ok).toBe(false);
-    expect(!result.ok && result.issues[0]).toContain("questions.mine.type");
+    expect(issuesIn(result)[0]).toContain("questions.mine.type");
   });
 
   test("Choice の選択肢は 1〜255 個", () => {
@@ -67,7 +72,7 @@ describe("validateSystemOneRequest", () => {
       questions: { c: { type: "choice", instructions: "?", criteria: {} } },
     });
     expect(empty.ok).toBe(false);
-    expect(!empty.ok && empty.issues[0]).toContain("questions.c.criteria");
+    expect(issuesIn(empty)[0]).toContain("questions.c.criteria");
 
     const tooMany = Object.fromEntries(Array.from({ length: 256 }, (_, i) => [`o${i}`, null]));
     const over = validateSystemOneRequest({
@@ -142,7 +147,13 @@ describe("validateSystemOneRequest", () => {
   test("provider は typesafe か gateway", () => {
     const result = validateSystemOneRequest({ state: "x", questions: { q: noulQ }, provider: "x" });
     expect(result.ok).toBe(false);
-    expect(!result.ok && result.issues.join()).toContain("provider");
+    expect(issuesIn(result).join()).toContain("provider");
+  });
+
+  test("問題の説明を日本語と英語の両方で返す", () => {
+    const result = validateSystemOneRequest({ state: "x", questions: { c: { type: "choice", criteria: {} } } });
+    expect(issuesIn(result, "ja").join()).toContain("1〜255 個");
+    expect(issuesIn(result, "en").join()).toContain("1 to 255 options");
   });
 
   test("問題をすべて列挙する", () => {

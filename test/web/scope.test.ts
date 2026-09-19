@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { Lang } from "../../src/contract/lang.ts";
 import { runUserCode } from "../../src/web/runner/execute.ts";
 import type { RunEvent } from "../../src/web/runner/record.ts";
 import { createRuntime, formatForLog, toCloneable } from "../../src/web/runner/scope.ts";
@@ -6,11 +7,22 @@ import { fakeTransport } from "./fake-transport.ts";
 
 const settings = { provider: "typesafe" as const, model: "jev-latest", llmModel: "openai/gpt-5.6-luna" };
 
-function setup(transport = fakeTransport(), overrides = {}) {
+function setup(transport = fakeTransport(), overrides = {}, lang: Lang = "ja") {
   const events: RunEvent[] = [];
-  const runtime = createRuntime(transport, (e) => events.push(e), { ...settings, ...overrides });
+  const runtime = createRuntime(transport, (e) => events.push(e), { ...settings, ...overrides }, lang);
   return { events, scope: runtime.globals, runtime, transport };
 }
+
+describe("引数の誤りは画面の言語で知らせる", () => {
+  test.each([
+    ["ja", "jev() には { state, questions } のオブジェクトを渡してください"],
+    ["en", "Pass jev() an object of { state, questions }"],
+  ] as const)("%s", async (lang, message) => {
+    const { scope } = setup(fakeTransport(), {}, lang);
+    const result = await runUserCode('await jev("hello");', scope);
+    expect(!result.ok && result.error.message).toContain(message);
+  });
+});
 
 describe("jev()", () => {
   test("既定の経路とモデルを足して送り、呼び出しの開始と終了を記録する", async () => {
@@ -98,8 +110,8 @@ describe("toCloneable と formatForLog", () => {
     const circular: Record<string, unknown> = { name: "c" };
     circular.self = circular;
     expect(toCloneable({ f: function named() {}, circular, m: new Map([["k", 1]]), s: new Set([1, 2]) })).toEqual({
-      f: "[関数 named]",
-      circular: { name: "c", self: "[循環参照]" },
+      f: "[Function: named]",
+      circular: { name: "c", self: "[Circular]" },
       m: { k: 1 },
       s: [1, 2],
     });

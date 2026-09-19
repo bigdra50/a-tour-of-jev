@@ -26,7 +26,7 @@ function fakeJev(id: "typesafe" | "gateway", seen: SystemOneRequest[] = []): Jev
     models: [`${id}-model`],
     evaluate: (request) => {
       seen.push(request);
-      return okAsync({ response: answer, upstream: trace, notes: [`${id} note`] });
+      return okAsync({ response: answer, upstream: trace, notes: [{ ja: `${id} の注記`, en: `${id} note` }] });
     },
   };
 }
@@ -46,9 +46,15 @@ let clock = 0;
 function api(overrides: Partial<ApiDeps> = {}) {
   return createApi({
     credentials: {
-      typesafe: { key: "ts_secret_value_1234", from: "TYPESAFE_API_KEY（環境変数）" },
-      gateway: { key: "vck_secret_value_5678", from: "AI_GATEWAY_API_KEY（.env.local）" },
-      notes: ["a note"],
+      typesafe: {
+        key: "ts_secret_value_1234",
+        from: { ja: "TYPESAFE_API_KEY（環境変数）", en: "TYPESAFE_API_KEY (environment variable)" },
+      },
+      gateway: {
+        key: "vck_secret_value_5678",
+        from: { ja: "AI_GATEWAY_API_KEY（.env.local）", en: "AI_GATEWAY_API_KEY (.env.local)" },
+      },
+      notes: [{ ja: "注記", en: "a note" }],
     },
     jev: { typesafe: fakeJev("typesafe"), gateway: fakeJev("gateway") },
     llm: fakeLlm,
@@ -63,12 +69,14 @@ function api(overrides: Partial<ApiDeps> = {}) {
   });
 }
 
-const post = (path: string, body: unknown) =>
+const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
   new Request(`http://localhost${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
+
+const japanese = { "accept-language": "ja,en-US;q=0.9" };
 
 const validBody = { state: "Help!", questions: { urgent: { type: "noul", instructions: "Urgent?" } } };
 
@@ -81,7 +89,7 @@ describe("GET /api/status", () => {
     const body = JSON.parse(text ?? "") as StatusResponse;
     expect(body.providers.typesafe).toEqual({
       configured: true,
-      from: "TYPESAFE_API_KEY（環境変数）",
+      from: "TYPESAFE_API_KEY (environment variable)",
       masked: "ts_…1234",
     });
     expect(body.providers.gateway.masked).toBe("vck_…5678");
@@ -94,12 +102,19 @@ describe("GET /api/status", () => {
 
   test("TypeSafe のキーが無ければ Gateway を既定にする", async () => {
     const response = await api({
-      credentials: { gateway: { key: "vck_x_1234567", from: "x" }, notes: [] },
+      credentials: { gateway: { key: "vck_x_1234567", from: { ja: "x", en: "x" } }, notes: [] },
       jev: { gateway: fakeJev("gateway") },
     })(new Request("http://localhost/api/status"));
     const body = (await response?.json()) as StatusResponse;
     expect(body.providers.typesafe).toEqual({ configured: false });
     expect(body.defaultProvider).toBe("gateway");
+  });
+
+  test("Accept-Language が日本語なら、キーの出どころと注記を日本語で返す", async () => {
+    const response = await api()(new Request("http://localhost/api/status", { headers: japanese }));
+    const body = (await response?.json()) as StatusResponse;
+    expect(body.providers.typesafe.from).toBe("TYPESAFE_API_KEY（環境変数）");
+    expect(body.notes).toEqual(["注記"]);
   });
 
   test("キーが 1 つも無ければ既定は null", async () => {
@@ -164,11 +179,33 @@ describe("POST /api/systemone", () => {
     expect(body.error.message).toContain("AI_GATEWAY_API_KEY");
   });
 
+  test("エラーは Accept-Language の言語で返し、指定が無ければ英語にする", async () => {
+    const english = (await (await api()(post("/api/systemone", { state: 1, questions: {} })))?.json()) as ApiErrorBody;
+    expect(english.error.message).toBe("The request does not have the right shape");
+    expect(english.error.issues?.join()).toContain("state: must be a string, object, or array");
+
+    const ja = (await (
+      await api()(post("/api/systemone", { state: 1, questions: {} }, japanese))
+    )?.json()) as ApiErrorBody;
+    expect(ja.error.message).toBe("リクエストの形が正しくありません");
+    expect(ja.error.issues?.join()).toContain("state: 文字列・オブジェクト・配列のいずれかにしてください");
+
+    const missing = (await (
+      await api({ jev: {} })(post("/api/systemone", validBody, japanese))
+    )?.json()) as ApiErrorBody;
+    expect(missing.error.message).toContain("サーバーを再起動してください");
+
+    const notes = (await (
+      await api()(post("/api/systemone", validBody, japanese))
+    )?.json()) as PlaygroundSystemOneResponse;
+    expect(notes.meta.notes).toEqual(["typesafe の注記"]);
+  });
+
   test("上流の 4xx はそのステータスで返す", async () => {
     const failing: JevProvider = {
       id: "typesafe",
       models: [],
-      evaluate: () => errAsync(upstreamFailure(422, "bad question", { detail: "x" })),
+      evaluate: () => errAsync(upstreamFailure(422, { ja: "質問が不正です", en: "bad question" }, { detail: "x" })),
     };
     const response = await api({ jev: { typesafe: failing } })(post("/api/systemone", validBody));
     expect(response?.status).toBe(422);
@@ -185,7 +222,7 @@ describe("POST /api/systemone", () => {
     const failing: JevProvider = {
       id: "typesafe",
       models: [],
-      evaluate: () => errAsync(upstreamFailure(529, "overloaded")),
+      evaluate: () => errAsync(upstreamFailure(529, { ja: "混雑しています", en: "overloaded" })),
     };
     const response = await api({ jev: { typesafe: failing } })(post("/api/systemone", validBody));
     expect(response?.status).toBe(502);
@@ -248,6 +285,12 @@ describe("ほかのサイトやほかの端末から使わせない", () => {
   test("別のオリジンからの呼び出しは 403", async () => {
     const response = await api()(request({ origin: "https://evil.example", host: "localhost:8765" }));
     expect(response?.status).toBe(403);
+  });
+
+  test("断るときの説明も Accept-Language の言語で返す", async () => {
+    const response = await api()(request({ host: "evil.example:8765", "accept-language": "ja" }));
+    const body = (await response?.json()) as ApiErrorBody;
+    expect(body.error.message).toBe("この API は localhost からだけ呼べます");
   });
 
   test("Host がローカル以外（DNS リバインディング）なら 403", async () => {

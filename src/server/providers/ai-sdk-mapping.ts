@@ -87,7 +87,11 @@ export function toUpstreamFailure(error: unknown, label: string): UpstreamFailur
     const details = parseMaybeJson(error.responseBody);
     const detail = extractErrorMessage(details) ?? error.message;
     const status = error.statusCode ?? 502;
-    return upstreamFailure(status, `${label} が ${status} を返しました: ${detail}`, details);
+    return upstreamFailure(
+      status,
+      { ja: `${label} が ${status} を返しました: ${detail}`, en: `${label} returned ${status}: ${detail}` },
+      details,
+    );
   }
 
   const status =
@@ -95,5 +99,8 @@ export function toUpstreamFailure(error: unknown, label: string): UpstreamFailur
       ? error.statusCode
       : 502;
   const message = error instanceof Error ? error.message : String(error);
-  return upstreamFailure(status, `${label} の呼び出しに失敗しました: ${message}`);
+  return upstreamFailure(status, {
+    ja: `${label} の呼び出しに失敗しました: ${message}`,
+    en: `The ${label} call failed: ${message}`,
+  });
 }

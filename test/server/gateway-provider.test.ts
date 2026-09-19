@@ -105,7 +105,8 @@ describe("createGatewayJevProvider", () => {
     const { provider, seen } = mockGateway(async () => gatewayAnswers);
     const result = (await provider.evaluate({ state: "x", questions, model: "jev-1.13.0" }))._unsafeUnwrap();
     expect(seen.modelIds).toEqual(["typesafe-ai/jev"]);
-    expect(result.notes.join()).toContain("jev-1.13.0");
+    expect(result.notes.map((note) => note.en).join()).toContain("jev-1.13.0");
+    expect(result.notes.map((note) => note.ja).join()).toContain("jev-1.13.0");
   });
 
   test("instructions の無い質問は空文字で送る（AI SDK では必須のため）", async () => {
@@ -141,6 +142,6 @@ describe("createGatewayJevProvider", () => {
     const failure = (await provider.evaluate({ state: "x", questions }))._unsafeUnwrapErr();
     expect(failure.kind).toBe("upstream");
     expect(failure.status).toBe(401);
-    expect(failure.message).toContain("Invalid API key");
+    expect(failure.message.en).toContain("Invalid API key");
   });
 });

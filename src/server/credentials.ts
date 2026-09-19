@@ -1,20 +1,22 @@
 // API キーの解決。キーの値はここから外へ出さない（ログ・注記・API 応答に含めない）。
 
+import { type Localized, pick, type Text } from "../contract/lang.ts";
+
 export interface CredentialSource {
-  /** 表示用の出どころ（例: "環境変数"、".env.local"）。 */
-  readonly origin: string;
+  /** 表示用の出どころ（例: { ja: "環境変数", en: "environment variable" }、".env.local"）。 */
+  readonly origin: Text;
   readonly vars: Readonly<Record<string, string | undefined>>;
 }
 
 export interface ResolvedKey {
   readonly key: string;
-  readonly from: string;
+  readonly from: Localized;
 }
 
 export interface Credentials {
   readonly typesafe?: ResolvedKey;
   readonly gateway?: ResolvedKey;
-  readonly notes: readonly string[];
+  readonly notes: readonly Localized[];
 }
 
 // TYPESAFE_API_KEY は公式 SDK、TYPESAFE_AI_API_KEY は AI SDK の TypeSafe プロバイダが読む名前。
@@ -26,7 +28,7 @@ const GATEWAY_KEY_PREFIX = "vck_";
 interface Candidate {
   readonly target: "typesafe" | "gateway";
   readonly key: string;
-  readonly from: string;
+  readonly from: Localized;
   /** Gateway 用の変数以外に Gateway のキーが入っていた。 */
   readonly misplaced: boolean;
 }
@@ -41,7 +43,7 @@ function candidatesOf({ origin, vars }: CredentialSource): Candidate[] {
       {
         target: isGatewayVar || isGatewayKey ? "gateway" : "typesafe",
         key,
-        from: `${name}（${origin}）`,
+        from: { ja: `${name}（${pick(origin, "ja")}）`, en: `${name} (${pick(origin, "en")})` },
         misplaced: isGatewayKey && !isGatewayVar,
       } satisfies Candidate,
     ];
@@ -61,7 +63,12 @@ export function resolveCredentials(sources: readonly CredentialSource[]): Creden
     ...(typesafe ? { typesafe: { key: typesafe.key, from: typesafe.from } } : {}),
     ...(gateway ? { gateway: { key: gateway.key, from: gateway.from } } : {}),
     notes: gateway?.misplaced
-      ? [`${gateway.from} は Vercel AI Gateway のキー（vck_ で始まる）なので、Gateway 経由の呼び出しに使います`]
+      ? [
+          {
+            ja: `${gateway.from.ja} は Vercel AI Gateway のキー（vck_ で始まる）なので、Gateway 経由の呼び出しに使います`,
+            en: `${gateway.from.en} holds a Vercel AI Gateway key (it starts with vck_), so it is used for calls through the Gateway`,
+          },
+        ]
       : [],
   };
 }

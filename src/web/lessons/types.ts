@@ -1,3 +1,4 @@
+import type { Localized, Text } from "../../contract/lang.ts";
 import type { RunRecord } from "../runner/record.ts";
 
 export type LessonId = string & { readonly __brand: "LessonId" };
@@ -7,37 +8,38 @@ export type PartId = "basics" | "inputs" | "scale" | "workflow" | "limits" | "fr
 
 export interface Part {
   readonly id: PartId;
-  readonly title: string;
+  readonly title: Localized;
 }
 
 export interface CheckResult {
   readonly pass: boolean;
-  readonly message: string;
+  readonly message: Localized;
 }
 
 export interface Exercise {
   /** 課題の文（Markdown）。 */
-  readonly goal: string;
-  readonly hint?: string;
-  /** 直近 1 回の実行記録だけを見て判定する。 */
+  readonly goal: Localized;
+  readonly hint?: Localized;
+  /** 直近 1 回の実行記録だけを見て判定する。判定の処理は言語によらず共通。 */
   readonly check: (run: RunRecord) => CheckResult;
 }
 
 export interface DocLink {
-  readonly title: string;
+  /** ドキュメントのページ名。英語のページ名は言語によらず同じ文字列でよい。 */
+  readonly title: Text;
   readonly url: string;
 }
 
 export interface Lesson {
   readonly id: LessonId;
   readonly part: PartId;
-  readonly title: string;
+  readonly title: Localized;
   /** 1 文の要約。目次とページ冒頭に出す。 */
-  readonly lead: string;
+  readonly lead: Localized;
   /** 本文（Markdown、一文一行）。 */
-  readonly body: string;
-  /** エディタの初期コード。 */
-  readonly code: string;
+  readonly body: Localized;
+  /** エディタの初期コード。言語ごとに注釈と表示用の文が違うだけで、API に送る内容は同じにする。 */
+  readonly code: Localized;
   readonly exercise?: Exercise;
   readonly docs: readonly DocLink[];
   /** "llm" は Vercel AI Gateway のキーが要るレッスン。 */

@@ -1,13 +1,18 @@
-import playgroundCode from "./code/playground.js" with { type: "text" };
+import playgroundEn from "./code/en/playground.js" with { type: "text" };
+import playgroundJa from "./code/ja/playground.js" with { type: "text" };
 import { type Lesson, lessonId } from "./types.ts";
 
 /** 自由に試す場所。コードで使える関数の早見表も兼ねる。 */
 export const playground: Lesson = {
   id: lessonId("playground"),
   part: "free",
-  title: "自由に試す",
-  lead: "レッスンで学んだことを、自分の題材で試す。",
-  body: `
+  title: { ja: "自由に試す", en: "Playground" },
+  lead: {
+    ja: "レッスンで学んだことを、自分の題材で試す。",
+    en: "Try what you learned in the lessons on your own material.",
+  },
+  body: {
+    ja: `
 ここでは課題はありません。
 自分の業務の文章やデータを state に入れて、質問を試してみてください。
 
@@ -37,7 +42,38 @@ export const playground: Lesson = {
 - 実行は 2 分で打ち切る
 - 書いたコードはこのブラウザに保存される。「初期コードに戻す」で消える
 `,
-  code: playgroundCode,
+    en: `
+There is no exercise here.
+Put text or data from your own work into the state and try out questions.
+
+## Available functions
+
+| Function | Description |
+| --- | --- |
+| \`await jev({ state, questions, model?, provider? })\` | Calls Jev. The answer is \`res.answers.<questionId>\` |
+| \`noul(instructions, criteria?)\` | A yes/no question. \`criteria\` is \`{ true, false }\` |
+| \`choice(instructions, { option: description })\` | A question that picks one of the options (up to 255) |
+| \`score(instructions, [level0, level1, ...])\` | A question with ordered levels (2 to 10) |
+| \`await llm.evaluate({ state, questions, model? })\` | Has a small LLM answer the same questions (needs a Gateway key) |
+| \`await llm.generate({ prompt, system?, model?, maxOutputTokens? })\` | Generates text with an LLM (needs a Gateway key) |
+| \`print(...values)\` | Prints the values on one line. \`console.log\` does the same |
+| \`show(value, label?)\` | Shows a value prominently. An array of objects becomes a table |
+| \`mean(numbers)\`, \`stdev(numbers)\` | Mean and sample standard deviation |
+| \`sleep(ms)\` | Waits for the given number of milliseconds |
+| \`settings\` | The route and model chosen at the top of the screen |
+
+Answers from \`jev()\` also come with \`meta\`.
+\`meta.latencyMs\` is the time taken, \`meta.costUsd\` is the cost, and \`meta.upstream\` is what was sent upstream.
+
+## Things to keep in mind
+
+- A failed call throws an exception. You can catch it with \`try { ... } catch (error) { ... }\`
+- Your code runs in a fresh environment every time. Variables from the previous run do not carry over
+- A run is cut off after 2 minutes
+- Your code is saved in this browser. "Reset code" clears it
+`,
+  },
+  code: { ja: playgroundJa, en: playgroundEn },
   docs: [
     { title: "API reference", url: "https://docs.typesafe.ai/api" },
     { title: "Cookbooks", url: "https://docs.typesafe.ai/cookbooks/consistency_noul_cookbook" },

@@ -1,5 +1,8 @@
 // 表示用の数値書式。確率は API と同じ小数、費用はドルと円（概算）で出す。
 
+/** 円の概算に使う固定レート。日本語の画面だけで使う。 */
+export const USD_JPY = 150;
+
 const twoSignificant = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 2 });
 const twoDecimals = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const integer = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });

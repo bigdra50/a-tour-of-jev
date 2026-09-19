@@ -1,70 +1,79 @@
 # A Tour of Jev
 
-TypeSafe の System One モデル Jev を、ブラウザで書いて実行して確かめるローカル教材です。
-A Tour of Go と同じく、左の解説を読み、右のエディタでコードを書き換えて実行します。
-答えは確率の目盛りや分布として表示されます。
+[日本語](README.ja.md)
 
-TypeSafe AI の公式の教材ではありません。
-内容は [TypeSafe のドキュメント](https://docs.typesafe.ai) をもとにしています。
+A local, hands-on tutorial for Jev, the System One model from TypeSafe AI.
+As in A Tour of Go, you read a lesson on the left, then edit and run code on the right.
+Answers appear as probability readouts: a scale for Noul, bars for Choice, and a ruler for Score.
 
-## 起動
+This is not an official TypeSafe AI tutorial.
+The content is based on the [TypeSafe documentation](https://docs.typesafe.ai).
 
-[Bun](https://bun.sh) 1.3 以降が必要です（`mise install` で入ります）。
+The interface and the lessons are available in English and Japanese.
+Switch between them with the Language menu at the top of the page.
+
+## Getting started
+
+You need [Bun](https://bun.sh) 1.3 or later (`mise install` sets it up).
 
 ```bash
 git clone https://github.com/bigdra50/a-tour-of-jev.git
 cd a-tour-of-jev
 bun install
-cp .env.example .env.local   # キーを書く
+cp .env.example .env.local   # put your keys here
 bun run dev                  # http://localhost:8765
 ```
 
-## API キー
+## API keys
 
-キーはサーバーの中だけで使い、ブラウザには送りません。
-シェルで export した環境変数と `.env.local` の両方を読みます。
+Keys are used only inside the local server and are never sent to the browser.
+The server reads both the variables exported in your shell and `.env.local`.
 
-| 変数 | 用途 |
+| Variable | Used for |
 | --- | --- |
-| `TYPESAFE_API_KEY` | TypeSafe の API を直接呼ぶ（`POST https://api.typesafe.ai/v1/systemone`） |
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway 経由で Jev を呼ぶ。小型 LLM との比較・連携のレッスンにも使う |
+| `TYPESAFE_API_KEY` | Calling the TypeSafe API directly (`POST https://api.typesafe.ai/v1/systemone`) |
+| `AI_GATEWAY_API_KEY` | Calling Jev through Vercel AI Gateway, and the lessons that compare or combine Jev with small LLMs |
 
-- `vck_` で始まるキーは Vercel AI Gateway のキーとみなし、どの変数名に入っていても Gateway 用に使う
-- シェルの `TYPESAFE_API_KEY` に Gateway のキーを入れたまま、`.env.local` の `TYPESAFE_API_KEY` に TypeSafe のキーを書いても、両方を使える
-- 画面上部の「経路」で、TypeSafe 直と Vercel AI Gateway を切り替えられる
+- A key that starts with `vck_` is treated as a Vercel AI Gateway key, whatever variable it is in
+- You can keep a Gateway key in your shell's `TYPESAFE_API_KEY` and put a TypeSafe key in `TYPESAFE_API_KEY` in `.env.local`. Both are used
+- Switch between the TypeSafe API and Vercel AI Gateway with the Route menu at the top of the page
 
-## レッスン
+## Lessons
 
-| 部 | 内容 |
+| Part | Lessons |
 | --- | --- |
-| はじめの一歩 | Hello Jev、Noul、Choice、Score、型の選び方 |
-| 入力を設計する | state の設計、説明の構造化、質問の分解 |
-| 速さ・確率・費用 | 並列質問と投機、confidence による分岐、同じ質問の繰り返し、トークンと費用 |
-| コードで組み立てる | ワークフロー、重みつきの合成、2 回に分けるとき |
-| 限界と組み合わせ | 苦手なこと、日本語、小型 LLM との比較、LLM との組み合わせ、AI SDK と Gateway |
+| First steps | Hello Jev, Noul, Choice, Score, choosing a type |
+| Designing inputs | Designing the state, structuring descriptions, breaking questions down |
+| Speed, probability, and cost | Parallel and speculative questions, branching on confidence, asking the same question again, tokens and cost |
+| Building with code | Workflows, weighted composites, when to split into two calls |
+| Limits and combinations | What Jev is bad at, using Japanese, comparing with a small LLM, combining with an LLM, the AI SDK and Gateway |
 
-最後の「自由に試す」は課題のない実験場です。
-書いたコードと進み具合はブラウザに保存されます。
+The last page, Playground, is a scratchpad with no exercise.
+Your code and progress are saved in the browser.
 
-## 開発
+## Development
 
 ```bash
-bun run check        # 型検査 + Biome + secretlint + テスト
-bun test             # テストだけ
-bun run secretlint   # キーの混入検査だけ
+bun run check        # typecheck + Biome + secretlint + tests
+bun test             # tests only
+bun run secretlint   # scan for leaked keys only
 ```
 
-`bun install` すると `.githooks/pre-commit` が有効になり、コミットするファイルを secretlint で検査します。
-推奨ルールに含まれる Vercel AI Gateway のキーに加え、TypeSafe のキー（`apikey_` で始まる）も検出します。
+`bun install` enables `.githooks/pre-commit`, which scans the files you commit with secretlint.
+Besides the Vercel AI Gateway keys covered by the recommended rules, it also detects TypeSafe keys (which start with `apikey_`).
 
-| 場所 | 中身 |
+| Path | Contents |
 | --- | --- |
-| `src/contract/` | Jev の HTTP 契約と、この教材のサーバー API の型・検証・価格 |
-| `src/server/` | Bun のサーバー。キーの解決と、TypeSafe 直・Gateway・小型 LLM の 3 つの上流 |
-| `src/web/runner/` | 学習者のコードを Web Worker で実行する仕組み |
-| `src/web/lessons/` | レッスンの本文と課題の判定。初期コードは `code/*.js` |
-| `src/web/app/` | React の画面 |
+| `src/contract/` | Jev's HTTP contract, and the types, validation, and pricing of this tutorial's server API |
+| `src/server/` | The Bun server: key resolution and three upstreams (TypeSafe API, Gateway, small LLMs) |
+| `src/web/runner/` | Runs the learner's code in a Web Worker |
+| `src/web/lessons/` | Lesson text and exercise checks. Starter code is in `code/ja/*.js` and `code/en/*.js` |
+| `src/web/app/` | The React UI. Its text is in `i18n.tsx` |
 
-レッスンを足すときは `src/web/lessons/code/` に初期コードを置き、各部のファイルに本文を書きます。
-テストは全レッスンの初期コードを偽の API で最後まで実行し、構文やプロパティ名の誤りを検出します。
-`TYPESAFE_BASE_URL` を設定すると、TypeSafe 直の接続先を差し替えられます（公式 SDK と同じ変数名）。
+To add a lesson, put its starter code in `src/web/lessons/code/ja/` and `code/en/`, and write its text in both languages in the part's file.
+The tests check two things.
+
+- Every lesson's starter code runs to the end against a fake API, which catches syntax errors and misspelled properties
+- The Japanese and English starter code send the same requests to the API
+
+Setting `TYPESAFE_BASE_URL` changes where the TypeSafe API route connects (the same variable name as the official SDK).

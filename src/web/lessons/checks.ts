@@ -1,6 +1,7 @@
 // 課題の判定に使う小さな道具。どれも実行記録（RunRecord）だけを見る純粋関数。
 
 import type { Answer, Questions, State } from "../../contract/jev.ts";
+import type { Localized } from "../../contract/lang.ts";
 import type { CallKind, CallRecord, RunRecord } from "../runner/record.ts";
 import type { CheckResult } from "./types.ts";
 
@@ -42,9 +43,12 @@ export function lastTable(run: RunRecord): readonly Record<string, unknown>[] | 
   return table?.value as Record<string, unknown>[] | undefined;
 }
 
-export const pass = (message: string): CheckResult => ({ pass: true, message });
-export const fail = (message: string): CheckResult => ({ pass: false, message });
+export const pass = (message: Localized): CheckResult => ({ pass: true, message });
+export const fail = (message: Localized): CheckResult => ({ pass: false, message });
 
-export const notRunYet = fail("まだ実行されていないか、呼び出しが失敗しました。コードを実行してください");
+export const notRunYet = fail({
+  ja: "まだ実行されていないか、呼び出しが失敗しました。コードを実行してください",
+  en: "The code has not run yet, or the call failed. Run the code.",
+});
 
 export const round2 = (x: number): string => x.toFixed(2);

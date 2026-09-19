@@ -1,16 +1,20 @@
+import type { Localized } from "../../contract/lang.ts";
+
 /** 上流（TypeSafe / Vercel AI Gateway）の失敗。status は上流の HTTP ステータス、接続失敗は 502、中断は 499。 */
 export interface UpstreamFailure {
   readonly kind: "upstream";
   readonly status: number;
-  readonly message: string;
+  /** 画面に出す説明。上流の英語のエラー文は両方の言語にそのまま入れる。 */
+  readonly message: Localized;
   readonly details?: unknown;
 }
 
-export const upstreamFailure = (status: number, message: string, details?: unknown): UpstreamFailure =>
+export const upstreamFailure = (status: number, message: Localized, details?: unknown): UpstreamFailure =>
   details === undefined ? { kind: "upstream", status, message } : { kind: "upstream", status, message, details };
 
 export const ABORTED_STATUS = 499;
-export const abortedFailure = (): UpstreamFailure => upstreamFailure(ABORTED_STATUS, "呼び出しを中断しました");
+export const abortedFailure = (): UpstreamFailure =>
+  upstreamFailure(ABORTED_STATUS, { ja: "呼び出しを中断しました", en: "The call was aborted" });
 
 type Obj = Record<string, unknown>;
 const isObject = (value: unknown): value is Obj => typeof value === "object" && value !== null && !Array.isArray(value);

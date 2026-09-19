@@ -1,23 +1,10 @@
 // 1 回の呼び出し（jev / llm.evaluate / llm.generate）の結果。答えの計器と、送受信した JSON。
 
 import type { Questions } from "../../contract/jev.ts";
-import { formatCost, formatMs, formatTokens } from "../lib/format.ts";
+import { formatCost, formatMs, formatTokens, USD_JPY } from "../lib/format.ts";
 import type { CallRecord } from "../runner/record.ts";
+import { useI18n } from "./i18n.tsx";
 import { AnswerReadout, summarizeAnswer } from "./Readouts.tsx";
-
-export const USD_JPY = 150;
-
-const KIND_LABEL: Readonly<Record<CallRecord["kind"], string>> = {
-  jev: "Jev",
-  "llm-evaluate": "LLM で評価",
-  "llm-generate": "LLM で生成",
-};
-
-const PROVIDER_LABEL: Readonly<Record<string, string>> = {
-  typesafe: "TypeSafe 直",
-  gateway: "Vercel AI Gateway",
-  llm: "Vercel AI Gateway",
-};
 
 function Json({ title, value }: { title: string; value: unknown }) {
   return (
@@ -29,24 +16,26 @@ function Json({ title, value }: { title: string; value: unknown }) {
 }
 
 function Meta({ call }: { call: Extract<CallRecord, { status: "ok" }> }) {
+  const { t } = useI18n();
   const { meta, usage, model } = call.response;
   const cost = formatCost(meta?.costUsd ?? null, USD_JPY);
   return (
     <p className="call-meta">
       <span className="call-model">{model}</span>
-      {meta && <span>{PROVIDER_LABEL[meta.provider] ?? meta.provider}</span>}
+      {meta && <span>{t.providers[meta.provider]}</span>}
       {meta && <span className="num">{formatMs(meta.latencyMs)}</span>}
       <span>
-        入力 <span className="num">{formatTokens(usage.input_tokens)}</span> / 出力{" "}
-        <span className="num">{formatTokens(usage.output_tokens)}</span> トークン
+        {t.input} <span className="num">{formatTokens(usage.input_tokens)}</span> / {t.output}{" "}
+        <span className="num">{formatTokens(usage.output_tokens)}</span> {t.tokens}
       </span>
       <span>
         {cost ? (
           <>
-            <span className="num">{cost.usd}</span>（約 <span className="num">{cost.jpy}</span>）
+            <span className="num">{cost.usd}</span>
+            {t.approximately(<span className="num">{cost.jpy}</span>)}
           </>
         ) : (
-          "費用 不明"
+          t.costUnknown
         )}
       </span>
     </p>
@@ -54,14 +43,15 @@ function Meta({ call }: { call: Extract<CallRecord, { status: "ok" }> }) {
 }
 
 export function CallCard({ call, collapsed }: { call: CallRecord; collapsed: boolean }) {
+  const { t } = useI18n();
   const questions = ((call.request as { questions?: Questions } | undefined)?.questions ?? {}) as Questions;
 
   if (call.status === "pending") {
     return (
       <article className="call call-pending" aria-busy="true">
         <header className="call-head">
-          <span className="call-kind">{KIND_LABEL[call.kind]}</span>
-          <span className="call-status">呼び出し中…</span>
+          <span className="call-kind">{t.kinds[call.kind]}</span>
+          <span className="call-status">{t.calling}</span>
         </header>
       </article>
     );
@@ -71,8 +61,11 @@ export function CallCard({ call, collapsed }: { call: CallRecord; collapsed: boo
     return (
       <article className="call call-error">
         <header className="call-head">
-          <span className="call-kind">{KIND_LABEL[call.kind]}</span>
-          <span className="call-status">失敗{call.error.status ? `（${call.error.status}）` : ""}</span>
+          <span className="call-kind">{t.kinds[call.kind]}</span>
+          <span className="call-status">
+            {t.failed}
+            {call.error.status ? ` (${call.error.status})` : ""}
+          </span>
         </header>
         <p className="call-error-message">{call.error.message}</p>
         {call.error.issues && (
@@ -83,9 +76,9 @@ export function CallCard({ call, collapsed }: { call: CallRecord; collapsed: boo
           </ul>
         )}
         <details className="call-json">
-          <summary>JSON を見る</summary>
-          <Json title="サーバーに送った内容" value={call.request} />
-          {call.error.details !== undefined && <Json title="上流のエラー本文" value={call.error.details} />}
+          <summary>{t.viewJson}</summary>
+          <Json title={t.sentToServer} value={call.request} />
+          {call.error.details !== undefined && <Json title={t.upstreamErrorBody} value={call.error.details} />}
         </details>
       </article>
     );
@@ -111,10 +104,10 @@ export function CallCard({ call, collapsed }: { call: CallRecord; collapsed: boo
         </p>
       ))}
       <details className="call-json">
-        <summary>JSON を見る</summary>
-        <Json title="サーバーに送った内容（jev() の引数）" value={call.request} />
-        {meta && <Json title={`上流に送った内容（${meta.upstream.url}）`} value={meta.upstream} />}
-        <Json title="応答" value={withoutMeta} />
+        <summary>{t.viewJson}</summary>
+        <Json title={t.sentToServerFromJev} value={call.request} />
+        {meta && <Json title={t.sentUpstream(meta.upstream.url)} value={meta.upstream} />}
+        <Json title={t.response} value={withoutMeta} />
       </details>
     </>
   );
@@ -123,7 +116,7 @@ export function CallCard({ call, collapsed }: { call: CallRecord; collapsed: boo
     return (
       <details className="call call-ok call-collapsed">
         <summary className="call-head">
-          <span className="call-kind">{KIND_LABEL[call.kind]}</span>
+          <span className="call-kind">{t.kinds[call.kind]}</span>
           <span className="call-summary">
             {answers
               ? Object.entries(answers).map(([id, answer]) => (
@@ -144,7 +137,7 @@ export function CallCard({ call, collapsed }: { call: CallRecord; collapsed: boo
   return (
     <article className="call call-ok">
       <header className="call-head">
-        <span className="call-kind">{KIND_LABEL[call.kind]}</span>
+        <span className="call-kind">{t.kinds[call.kind]}</span>
       </header>
       <Meta call={call} />
       {body}

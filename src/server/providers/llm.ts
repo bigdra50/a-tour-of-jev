@@ -77,7 +77,7 @@ const toUsage = (usage: { inputTokens?: number; outputTokens?: number }): Usage 
 export function createLlmProvider(options: LlmProviderOptions): LlmProvider {
   const wrap = <T>(model: string, signal: AbortSignal | undefined, run: Promise<T>) =>
     ResultAsync.fromPromise(run, (error) =>
-      signal?.aborted ? abortedFailure() : toUpstreamFailure(error, `LLM（${model}）`),
+      signal?.aborted ? abortedFailure() : toUpstreamFailure(error, `LLM (${model})`),
     );
 
   async function evaluate(request: LlmEvaluateRequest, signal: AbortSignal | undefined): Promise<LlmEvaluateResult> {

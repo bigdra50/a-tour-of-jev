@@ -26,4 +26,4 @@ for (const provider of ["typesafe", "gateway"]) {
     rows.push({ 経路: provider, エラー: error.message });
   }
 }
-show(rows, "TypeSafe 直と Vercel AI Gateway");
+show(rows, "TypeSafe API と Vercel AI Gateway");

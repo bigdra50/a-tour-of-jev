@@ -3,6 +3,7 @@
 // シェルの変数が .env.local の同名変数を隠しても、両方のキーを拾えるようにするため（credentials.ts 参照）。
 
 import { createGateway } from "@ai-sdk/gateway";
+import { parseLang } from "../contract/lang.ts";
 import homepage from "../web/index.html";
 import { createApi } from "./api.ts";
 import { type Credentials, maskKey, parseEnvFile, resolveCredentials } from "./credentials.ts";
@@ -13,6 +14,8 @@ import { createTypeSafeProvider } from "./providers/typesafe.ts";
 
 const ROOT = new URL("../../", import.meta.url);
 const production = process.env.NODE_ENV === "production";
+// 端末に出すログの言語。ブラウザの画面の言語とは別に、端末のロケールに合わせる
+const lang = parseLang(process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG);
 
 async function readEnvLocal(): Promise<Record<string, string>> {
   const file = Bun.file(new URL(".env.local", ROOT));
@@ -30,21 +33,23 @@ async function buildWorker(): Promise<string> {
   });
   const output = result.outputs[0];
   if (!result.success || !output) {
-    throw new Error(`Worker のビルドに失敗しました:\n${result.logs.map(String).join("\n")}`);
+    const heading = lang === "ja" ? "Worker のビルドに失敗しました" : "Failed to build the worker";
+    throw new Error(`${heading}:\n${result.logs.map(String).join("\n")}`);
   }
   return output.text();
 }
 
 function describeKeys(credentials: Credentials): string[] {
+  const notSet = lang === "ja" ? "未設定" : "not set";
+  const width = "Vercel AI Gateway".length;
   const line = (label: string, key: Credentials["typesafe"]) =>
-    key ? `  ${label}: ${key.from} ${maskKey(key.key)}` : `  ${label}: 未設定`;
-  // 「直」は端末で 2 桁ぶんの幅をとるので、空白は 6 個で「Vercel AI Gateway」（17 桁）とそろう
-  return [line("TypeSafe 直      ", credentials.typesafe), line("Vercel AI Gateway", credentials.gateway)];
+    key ? `  ${label.padEnd(width)}: ${key.from[lang]} ${maskKey(key.key)}` : `  ${label.padEnd(width)}: ${notSet}`;
+  return [line("TypeSafe API", credentials.typesafe), line("Vercel AI Gateway", credentials.gateway)];
 }
 
 const envLocal = await readEnvLocal();
 const credentials = resolveCredentials([
-  { origin: "環境変数", vars: process.env },
+  { origin: { ja: "環境変数", en: "environment variable" }, vars: process.env },
   { origin: ".env.local", vars: envLocal },
 ]);
 
@@ -92,9 +97,13 @@ console.log(
   [
     `A Tour of Jev: http://localhost:${server.port}/`,
     ...describeKeys(credentials),
-    ...credentials.notes.map((note) => `  注: ${note}`),
+    ...credentials.notes.map((note) => (lang === "ja" ? `  注: ${note.ja}` : `  Note: ${note.en}`)),
     ...(credentials.typesafe || credentials.gateway
       ? []
-      : ["  キーが 1 つもありません。.env.example を .env.local にコピーして値を入れ、再起動してください"]),
+      : [
+          lang === "ja"
+            ? "  キーが 1 つもありません。.env.example を .env.local にコピーして値を入れ、再起動してください"
+            : "  No API keys found. Copy .env.example to .env.local, fill in the values, and restart",
+        ]),
   ].join("\n"),
 );

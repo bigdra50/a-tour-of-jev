@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Questions } from "../../src/contract/jev.ts";
+import { LANGS } from "../../src/contract/lang.ts";
 import { findLesson, LESSONS, neighbors, PARTS } from "../../src/web/lessons/index.ts";
 import { type LessonId, lessonId } from "../../src/web/lessons/types.ts";
 import { renderMarkdown } from "../../src/web/lib/markdown.ts";
@@ -11,9 +12,9 @@ import { fakeAnswers, fakeTransport } from "./fake-transport.ts";
 const settings = { provider: "typesafe" as const, model: "jev-latest", llmModel: "openai/gpt-5.6-luna" };
 
 /** レッスンのコードを偽の API で実行し、実行記録を返す。 */
-async function runLesson(code: string): Promise<RunRecord> {
+async function runLesson(code: string, transport = fakeTransport()): Promise<RunRecord> {
   const events: RunEvent[] = [];
-  const runtime = createRuntime(fakeTransport(), (e) => events.push(e), settings);
+  const runtime = createRuntime(transport, (e) => events.push(e), settings, "en");
   const result = await runUserCode(code, runtime.globals);
   await runtime.whenIdle();
   events.push(
@@ -46,6 +47,8 @@ function recordOf(
   return [...events, ...shows, { type: "done", ok: true } as RunEvent].reduce(reduceRun, emptyRun());
 }
 
+const byLang = LESSONS.flatMap((lesson) => LANGS.map((lang) => [lesson.id, lang, lesson] as const));
+
 const check = (id: string, run: RunRecord) => {
   const exercise = findLesson(id)?.exercise;
   if (!exercise) throw new Error(`${id} に課題がありません`);
@@ -69,29 +72,31 @@ describe("レッスンの形", () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
-  test.each(LESSONS.map((lesson) => [lesson.id, lesson] as const))("%s: 必須項目が埋まっている", (_, lesson) => {
-    expect(lesson.title.trim()).not.toBe("");
-    expect(lesson.lead.trim()).not.toBe("");
-    expect(lesson.body.trim()).not.toBe("");
-    expect(lesson.code.trim()).not.toBe("");
+  test.each(byLang)("%s (%s): 必須項目が埋まっている", (_, lang, lesson) => {
+    expect(lesson.title[lang].trim()).not.toBe("");
+    expect(lesson.lead[lang].trim()).not.toBe("");
+    expect(lesson.body[lang].trim()).not.toBe("");
+    expect(lesson.code[lang].trim()).not.toBe("");
+    if (lesson.exercise) expect(lesson.exercise.goal[lang].trim()).not.toBe("");
     expect(lesson.docs.length).toBeGreaterThan(0);
     for (const doc of lesson.docs) expect(doc.url).toStartWith("https://");
   });
 
-  test.each(LESSONS.map((lesson) => [lesson.id, lesson] as const))(
-    "%s: 本文が Markdown として描画できる",
-    (_, lesson) => {
-      const html = renderMarkdown(lesson.body);
-      // エスケープ漏れがあると「\`」がそのまま残る
-      expect(html).not.toContain("\\`");
-      expect(html).not.toContain("${");
-    },
-  );
+  test.each(byLang)("%s (%s): 本文が Markdown として描画できる", (_, lang, lesson) => {
+    const html = renderMarkdown(lesson.body[lang]);
+    // エスケープ漏れがあると「\`」がそのまま残る
+    expect(html).not.toContain("\\`");
+    expect(html).not.toContain("${");
+  });
+
+  test.each(PARTS.map((part) => [part.id, part] as const))("%s: 部の見出しが両言語にある", (_, part) => {
+    for (const lang of LANGS) expect(part.title[lang].trim()).not.toBe("");
+  });
 });
 
 describe("レッスンのコードが最後まで動く（偽の API で実行）", () => {
-  test.each(LESSONS.map((lesson) => [lesson.id, lesson] as const))("%s", async (_, lesson) => {
-    const run = await runLesson(lesson.code);
+  test.each(byLang)("%s (%s)", async (_, lang, lesson) => {
+    const run = await runLesson(lesson.code[lang]);
     expect(run.error).toBeUndefined();
     expect(run.status).toBe("done");
     expect(run.calls.length).toBeGreaterThan(0);
@@ -99,11 +104,35 @@ describe("レッスンのコードが最後まで動く（偽の API で実行�
   });
 });
 
+describe("日本語版と英語版の初期コードは、API に同じ内容を送る", () => {
+  test.each(LESSONS.map((lesson) => [lesson.id, lesson] as const))("%s", async (_, lesson) => {
+    // consistency のように state に Math.random() を入れるレッスンがあるので、両方の実行で同じ乱数列にそろえる
+    const sent = async (code: string) => {
+      const transport = fakeTransport();
+      const random = Math.random;
+      let seed = 0;
+      Math.random = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
+      try {
+        await runLesson(code, transport);
+      } finally {
+        Math.random = random;
+      }
+      return transport.bodies;
+    };
+    expect(await sent(lesson.code.en)).toEqual(await sent(lesson.code.ja));
+  });
+});
+
 describe("課題の判定", () => {
   test.each(LESSONS.filter((l) => l.exercise).map((l) => [l.id, l] as const))(
-    "%s: 何も実行していなければ合格にならない",
+    "%s: 何も実行していなければ合格にならず、両言語の説明が出る",
     (_, lesson) => {
-      expect(lesson.exercise?.check(emptyRun()).pass).toBe(false);
+      const result = lesson.exercise?.check(emptyRun());
+      expect(result?.pass).toBe(false);
+      for (const lang of LANGS) expect(result?.message[lang].trim()).not.toBe("");
     },
   );
 
@@ -177,9 +206,8 @@ describe("課題の判定", () => {
     expect(check("fanout", recordOf([{ request: { questions: q(5) } }])).pass).toBe(false);
   });
 
-  test("confidence: 表の行動が 4 種類で合格", () => {
-    const row = (行動: string) => ({ 行動 });
-    const four = [row("a"), row("b"), row("c"), row("d")];
+  test.each(["行動", "action"])("confidence: 表の %s の列が 4 種類で合格（英語版の列名は action）", (column) => {
+    const four = ["a", "b", "c", "d"].map((value) => ({ [column]: value }));
     expect(check("confidence", recordOf([], [four])).pass).toBe(true);
     expect(check("confidence", recordOf([], [four.slice(0, 3)])).pass).toBe(false);
   });

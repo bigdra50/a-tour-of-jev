@@ -2,7 +2,9 @@
 // 無限ループや重い処理があっても画面が固まらないよう、メインスレッドとは分けている。
 
 import { err, ok, type Result } from "neverthrow";
+import type { Lang } from "../../contract/lang.ts";
 import { runUserCode } from "./execute.ts";
+import { RUNNER_MESSAGES } from "./messages.ts";
 import type { CallError, RunEvent } from "./record.ts";
 import { createRuntime, formatForLog, type RunSettings, type Transport, toCloneable } from "./scope.ts";
 
@@ -18,19 +20,21 @@ const emit = (event: RunEvent) => context.postMessage(event);
 type Obj = Record<string, unknown>;
 const isObject = (value: unknown): value is Obj => typeof value === "object" && value !== null && !Array.isArray(value);
 
+// Worker は 1 回の実行ごとに作り直すので、最初のメッセージで受け取った言語をこの実行の間ずっと使う
+let lang: Lang = "en";
+
 async function post<T>(path: string, body: unknown): Promise<Result<T, CallError>> {
   let response: Response;
   try {
     response = await fetch(path, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      // サーバーのエラー文も画面の言語で返してもらう（ブラウザの既定の Accept-Language は画面の言語と違いうる）
+      headers: { "content-type": "application/json", "accept-language": lang },
       body: JSON.stringify(body),
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    return err({
-      message: `この教材のサーバーに接続できません（${reason}）。bun run dev が動いているか確認してください`,
-    });
+    return err({ message: RUNNER_MESSAGES[lang].serverUnreachable(reason) });
   }
   const data: unknown = await response.json().catch(() => undefined);
   if (response.ok) return ok(data as T);
@@ -54,13 +58,17 @@ context.addEventListener("unhandledrejection", (event) => {
   emit({
     type: "log",
     level: "error",
-    text: `await していない処理が失敗しました: ${formatForLog([event.reason instanceof Error ? event.reason.message : event.reason])}`,
+    text: RUNNER_MESSAGES[lang].unhandledRejection(
+      formatForLog([event.reason instanceof Error ? event.reason.message : event.reason]),
+    ),
   });
 });
 
 context.addEventListener("message", async (event) => {
-  const { code, settings } = event.data as { code: string; settings: RunSettings };
-  const runtime = createRuntime(transport, emit, settings);
+  const data = event.data as { code: string; settings: RunSettings; lang: Lang };
+  lang = data.lang;
+  const runtime = createRuntime(transport, emit, data.settings, lang);
+  const { code } = data;
   const result = await runUserCode(code, runtime.globals);
   await runtime.whenIdle();
   emit(

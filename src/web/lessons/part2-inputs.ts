@@ -1,7 +1,10 @@
 import { evaluatedCalls, fail, lastAnswer, lastCallWith, notRunYet, pass, round2 } from "./checks.ts";
-import atomicCode from "./code/atomic.js" with { type: "text" };
-import stateCode from "./code/state.js" with { type: "text" };
-import structureCode from "./code/structure.js" with { type: "text" };
+import atomicEn from "./code/en/atomic.js" with { type: "text" };
+import stateEn from "./code/en/state.js" with { type: "text" };
+import structureEn from "./code/en/structure.js" with { type: "text" };
+import atomicJa from "./code/ja/atomic.js" with { type: "text" };
+import stateJa from "./code/ja/state.js" with { type: "text" };
+import structureJa from "./code/ja/structure.js" with { type: "text" };
 import { type Lesson, lessonId } from "./types.ts";
 
 const DOCS = "https://docs.typesafe.ai";
@@ -12,9 +15,13 @@ export const inputs: readonly Lesson[] = [
   {
     id: lessonId("state"),
     part: "inputs",
-    title: "state の設計",
-    lead: "判断の材料を 1 つの state にまとめる。必要な部分だけを渡し、質問からはパスで指す。",
-    body: `
+    title: { ja: "state の設計", en: "Designing the state" },
+    lead: {
+      ja: "判断の材料を 1 つの state にまとめる。必要な部分だけを渡し、質問からはパスで指す。",
+      en: "Put the material for the judgment into a single state. Pass only what you need, and point to its parts from the questions with paths.",
+    },
+    body: {
+      ja: `
 state は、モデルに評価してもらう材料です。
 文字列・JSON オブジェクト・配列のどれでも渡せます。
 
@@ -42,10 +49,45 @@ state がオブジェクトのときは、質問の中で \`\` \`ticket.messages
 - 入力はテキストだけ。画像や音声はテキストや構造化したフィールドにしてから渡す
 - モデルの知識に頼らず、判断に要る最新の情報は自分のデータから state に入れる
 `,
-    code: stateCode,
+      en: `
+The state is the material the model evaluates.
+You can pass a string, a JSON object, or an array.
+
+| Shape | Good for | Example |
+| --- | --- | --- |
+| String | A single message or piece of text | \`"My card was charged twice."\` |
+| Object | Named fields, related records, app state | \`{ "message": "...", "order_id": "A-104" }\` |
+| Array | A sequence of messages or records | \`["Hi", "My customer number is TS1337."]\` |
+
+In most cases, an object is the best choice.
+Each part gets a name, and the relationships between the parts are clear.
+The documentation says to think of the state as "the material you would present to a panel of experts before asking them to make a judgment".
+Things that need to be compared, like a conversation, an order, and a policy, go into the same state.
+
+## Point to parts with paths from the questions
+
+When the state is an object, point to a location inside a question with a dot-and-index path wrapped in backticks, like \`\` \`ticket.messages[0].text\` \`\`.
+The key is to include the backticks themselves.
+This tells the model exactly which part to judge.
+
+## Don't put in too much
+
+- Leave out information unrelated to the questions. The more irrelevant information there is, the easier it is to misjudge
+- The limit per request is 64k tokens in total, and 32k tokens for the state plus the longest question
+- Input is text only. Turn images and audio into text or structured fields before passing them
+- Do not rely on the model's knowledge. Put the up-to-date information the judgment needs into the state from your own data
+`,
+    },
+    code: { ja: stateJa, en: stateEn },
     exercise: {
-      goal: "サポート側の返信 `ticket.messages[1].text` を指す Noul を足して、返金を求めていないと判定される（0.5 未満になる）か確かめましょう。",
-      hint: '例: ``support_requests_refund: noul("Does `ticket.messages[1].text` request a refund?")``',
+      goal: {
+        ja: "サポート側の返信 `ticket.messages[1].text` を指す Noul を足して、返金を求めていないと判定される（0.5 未満になる）か確かめましょう。",
+        en: "Add a Noul that points to the support reply `ticket.messages[1].text`, and check that it is judged as not asking for a refund (below 0.5).",
+      },
+      hint: {
+        ja: '例: ``support_requests_refund: noul("Does `ticket.messages[1].text` request a refund?")``',
+        en: 'Example: ``support_requests_refund: noul("Does `ticket.messages[1].text` request a refund?")``',
+      },
       check: (run) => {
         const calls = evaluatedCalls(run);
         if (calls.length === 0) return notRunYet;
@@ -57,24 +99,40 @@ state がオブジェクトのときは、質問の中で \`\` \`ticket.messages
           }),
         );
         const value = found.at(-1);
-        if (value === undefined) return fail("`ticket.messages[1].text` を指す Noul がまだありません");
+        if (value === undefined) {
+          return fail({
+            ja: "`ticket.messages[1].text` を指す Noul がまだありません",
+            en: "There is no Noul pointing to `ticket.messages[1].text` yet.",
+          });
+        }
+        const shown = round2(value);
         return value < 0.5
-          ? pass(`サポートの返信は返金を求めていない（${round2(value)}）と判定されました`)
-          : fail(`${round2(value)} でした。質問の書き方を見直してみましょう`);
+          ? pass({
+              ja: `サポートの返信は返金を求めていない（${shown}）と判定されました`,
+              en: `The support reply was judged as not asking for a refund (${shown}).`,
+            })
+          : fail({
+              ja: `${shown} でした。質問の書き方を見直してみましょう`,
+              en: `It was ${shown}. Try rewording the question.`,
+            });
       },
     },
     docs: [
       { title: "State", url: `${DOCS}/concepts/state` },
       { title: "Reference specific fields", url: `${DOCS}/primitives#reference-specific-fields` },
-      { title: "Models（上限）", url: `${DOCS}/models` },
+      { title: { ja: "Models（上限）", en: "Models (limits)" }, url: `${DOCS}/models` },
     ],
   },
   {
     id: lessonId("structure"),
     part: "inputs",
-    title: "説明を構造化する",
-    lead: "説明が長くなったら、1 本の文字列に詰め込まずにオブジェクトで書く。",
-    body: `
+    title: { ja: "説明を構造化する", en: "Structuring descriptions" },
+    lead: {
+      ja: "説明が長くなったら、1 本の文字列に詰め込まずにオブジェクトで書く。",
+      en: "When a description grows long, write it as an object instead of cramming it into one string.",
+    },
+    body: {
+      ja: `
 次の 4 か所は、文字列だけでなくオブジェクトや配列も受け付けます。
 
 - \`instructions\`（3 つの型すべて）
@@ -100,17 +158,55 @@ state がオブジェクトのときは、質問の中で \`\` \`ticket.messages
 
 \`instructions\` も同じように、\`{ question, focus }\` や \`{ question, compare: [...] }\` の形で書けます。
 `,
-    code: structureCode,
+      en: `
+These four places accept objects and arrays, not just strings.
+
+- \`instructions\` (all three types)
+- The descriptions of Choice options
+- Each level of a Score
+- \`criteria.true\` and \`criteria.false\` of a Noul
+
+## Tell apart options that are easy to confuse
+
+On the right, \`return_policy\` (the rules for returns) and \`return_status\` (the progress of a return) are easy to mix up, because both involve returns and refunds.
+In a case like this, split each option into fields like these.
+
+- \`what\`: what this option covers
+- \`not_for\`: what belongs to the neighboring option instead
+- \`examples\`: examples of typical inputs
+
+The field names are not reserved words in the API, so you can choose them freely.
+The model reads the names too, so pick names that briefly describe the contents.
+Using the same field names for every option makes it easier for the model to compare the options.
+
+A short, unambiguous description works fine as a string.
+Start with strings, and add structure once options start getting confused.
+
+\`instructions\` can be structured the same way, as \`{ question, focus }\` or \`{ question, compare: [...] }\`.
+`,
+    },
+    code: { ja: structureJa, en: structureEn },
     exercise: {
-      goal: "`ticket` を返品ルールの質問（例: セール品は返品できるか）に書き換え、`structured` が return_policy を confidence 0.8 以上で選ぶか確かめましょう。",
+      goal: {
+        ja: "`ticket` を返品ルールの質問（例: セール品は返品できるか）に書き換え、`structured` が return_policy を confidence 0.8 以上で選ぶか確かめましょう。",
+        en: "Rewrite `ticket` as a question about the return rules (for example, whether sale items can be returned), and check whether `structured` picks return_policy with a confidence of 0.8 or higher.",
+      },
       check: (run) => {
         const answer = lastAnswer(run, "structured");
         if (answer?.type !== "choice") return notRunYet;
-        const confidence = answer.confidence ?? 0;
-        if (answer.choice !== "return_policy") return fail(`今は ${answer.choice} が選ばれています`);
-        return confidence >= 0.8
-          ? pass(`return_policy を confidence ${round2(confidence)} で選びました`)
-          : fail(`return_policy ですが confidence は ${round2(confidence)} です`);
+        const confidence = round2(answer.confidence ?? 0);
+        if (answer.choice !== "return_policy") {
+          return fail({ ja: `今は ${answer.choice} が選ばれています`, en: `Right now ${answer.choice} is chosen.` });
+        }
+        return (answer.confidence ?? 0) >= 0.8
+          ? pass({
+              ja: `return_policy を confidence ${confidence} で選びました`,
+              en: `Chose return_policy with confidence ${confidence}.`,
+            })
+          : fail({
+              ja: `return_policy ですが confidence は ${confidence} です`,
+              en: `It is return_policy, but confidence is ${confidence}.`,
+            });
       },
     },
     docs: [
@@ -121,9 +217,13 @@ state がオブジェクトのときは、質問の中で \`\` \`ticket.messages
   {
     id: lessonId("atomic"),
     part: "inputs",
-    title: "質問を分解する",
-    lead: "広い質問は複数の判断を隠す。1 つの性質だけを見る質問に分け、コードで組み合わせる。",
-    body: `
+    title: { ja: "質問を分解する", en: "Breaking questions down" },
+    lead: {
+      ja: "広い質問は複数の判断を隠す。1 つの性質だけを見る質問に分け、コードで組み合わせる。",
+      en: "A broad question hides several judgments. Split it into questions that each look at one property, and combine them in code.",
+    },
+    body: {
+      ja: `
 ドキュメントが「おそらくいちばん重要な考え方」と書いているのが、質問の分解です。
 
 "Is this email spam?" という 1 つの質問には、複数の判断が隠れています。
@@ -146,10 +246,40 @@ state がオブジェクトのときは、質問の中で \`\` \`ticket.messages
 "Analyze this message and determine the best course of action" は、ゆっくり考える必要があるので向いていません。
 こういう問いは、小さな質問に分けてコードで組み合わせます。
 `,
-    code: atomicCode,
+      en: `
+The documentation calls atomic questions "probably the most important concept in this guide".
+
+The single question "Is this email spam?" hides several judgments.
+
+- Whether it asks for credentials such as a password
+- Whether the sender's claimed name and the email domain disagree
+- Whether it announces a reward nobody asked for
+
+If you keep the broad question, you cannot tell which judgment went wrong when the answer is off.
+Once you split it, you can do the following.
+
+- Check which judgment went wrong
+- Tune the weights in code (no need to rewrite the prompt)
+- Questions about the same state are evaluated in parallel, so splitting adds no round trips
+
+## Ask questions that can be answered in an instant
+
+The documentation's rule of thumb is a judgment that a knowledgeable person, given the context, could make in one second.
+"Does this message convey urgency?" is a good question.
+"Analyze this message and determine the best course of action" needs slow thinking, so it is a poor fit.
+Split questions like that into small ones and combine them in code.
+`,
+    },
+    code: { ja: atomicJa, en: atomicEn },
     exercise: {
-      goal: "差出人と本文を正規の業務連絡に書き換えて、合成した `spam_risk` を 0.2 未満にしましょう。",
-      hint: "差出人の display_name とメールのドメインをそろえ、本文から報酬とパスワードの話を消します。",
+      goal: {
+        ja: "差出人と本文を正規の業務連絡に書き換えて、合成した `spam_risk` を 0.2 未満にしましょう。",
+        en: "Rewrite the sender and the message as a legitimate business email, and get the combined `spam_risk` below 0.2.",
+      },
+      hint: {
+        ja: "差出人の display_name とメールのドメインをそろえ、本文から報酬とパスワードの話を消します。",
+        en: "Make the sender's display_name match the email domain, and remove the talk of rewards and passwords from the message.",
+      },
       check: (run) => {
         const call = lastCallWith(run, "requests_credentials");
         if (!call) return notRunYet;
@@ -158,10 +288,22 @@ state がオブジェクトのときは、質問の中で \`\` \`ticket.messages
           return answer?.type === "noul" ? w * answer.noul : Number.NaN;
         });
         const risk = nouls.reduce((sum, v) => sum + v, 0);
-        if (Number.isNaN(risk)) return fail("3 つの分解した質問を残したまま実行してください");
+        if (Number.isNaN(risk)) {
+          return fail({
+            ja: "3 つの分解した質問を残したまま実行してください",
+            en: "Keep the three split questions when you run the code.",
+          });
+        }
+        const shown = round2(risk);
         return risk < 0.2
-          ? pass(`spam_risk = ${round2(risk)}。正規のメールと判断されました`)
-          : fail(`spam_risk = ${round2(risk)}。どの要素が高いかを出力で確かめましょう`);
+          ? pass({
+              ja: `spam_risk = ${shown}。正規のメールと判断されました`,
+              en: `spam_risk = ${shown}. Judged as a legitimate email.`,
+            })
+          : fail({
+              ja: `spam_risk = ${shown}。どの要素が高いかを出力で確かめましょう`,
+              en: `spam_risk = ${shown}. Check the output to see which factor is high.`,
+            });
       },
     },
     docs: [

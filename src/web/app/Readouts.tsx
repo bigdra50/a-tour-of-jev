@@ -2,6 +2,7 @@
 
 import type { Answer, ChoiceAnswer, EntryType, NoulAnswer, Question, ScoreAnswer } from "../../contract/jev.ts";
 import { formatPercent, formatProbability } from "../lib/format.ts";
+import { useI18n } from "./i18n.tsx";
 
 type JsonObject = Exclude<EntryType, string | null | readonly unknown[]>;
 const isJsonObject = (entry: EntryType): entry is JsonObject =>
@@ -42,11 +43,12 @@ function Scale({ value, label }: { value: number; label: string }) {
 }
 
 function Confidence({ value }: { value: number | undefined }) {
+  const { t } = useI18n();
   if (value === undefined) {
-    return <span className="confidence confidence-none">confidence なし</span>;
+    return <span className="confidence confidence-none">{t.noConfidence}</span>;
   }
   return (
-    <span className="confidence" title="確率の分布がどれだけ 1 か所に集中しているか（0〜1）">
+    <span className="confidence" title={t.confidenceTitle}>
       <span className="confidence-label">confidence</span>
       <span className="confidence-meter" aria-hidden="true">
         <span style={{ width: `${Math.min(Math.max(value, 0), 1) * 100}%` }} />
@@ -57,18 +59,22 @@ function Confidence({ value }: { value: number | undefined }) {
 }
 
 function NoulReadout({ answer }: { answer: NoulAnswer }) {
+  const { t } = useI18n();
   return (
     <div className="readout-body readout-noul">
       <p className="readout-figure">
         <span className="num readout-big">{formatProbability(answer.noul)}</span>
-        <span className="readout-caption">yes である確率（{formatPercent(answer.noul)}）</span>
+        <span className="readout-caption">
+          {t.probabilityOfYes} ({formatPercent(answer.noul)})
+        </span>
       </p>
-      <Scale value={answer.noul} label={`yes である確率 ${formatProbability(answer.noul)}`} />
+      <Scale value={answer.noul} label={`${t.probabilityOfYes} ${formatProbability(answer.noul)}`} />
     </div>
   );
 }
 
 function ChoiceReadout({ answer, question }: { answer: ChoiceAnswer; question: Question | undefined }) {
+  const { t } = useI18n();
   const criteria = question?.type === "choice" ? question.criteria : undefined;
   const probabilities = answer.probabilities;
   const rows = probabilities
@@ -81,7 +87,9 @@ function ChoiceReadout({ answer, question }: { answer: ChoiceAnswer; question: Q
         <p className="readout-figure">
           <span className="readout-choice-name">{answer.choice}</span>
           {probabilities?.[answer.choice] !== undefined && (
-            <span className="readout-caption">確率 {formatProbability(probabilities[answer.choice] ?? 0)}</span>
+            <span className="readout-caption">
+              {t.probability} {formatProbability(probabilities[answer.choice] ?? 0)}
+            </span>
           )}
         </p>
         <Confidence value={answer.confidence} />
@@ -93,7 +101,7 @@ function ChoiceReadout({ answer, question }: { answer: ChoiceAnswer; question: Q
               {option}
             </span>
             {p === undefined ? (
-              <span className="bar-empty">{option === answer.choice ? "選択" : ""}</span>
+              <span className="bar-empty">{option === answer.choice ? t.chosen : ""}</span>
             ) : (
               <>
                 <span className="bar-track" aria-hidden="true">
@@ -105,12 +113,13 @@ function ChoiceReadout({ answer, question }: { answer: ChoiceAnswer; question: Q
           </li>
         ))}
       </ul>
-      {!probabilities && <p className="readout-note">この答えには確率の分布がありません（LLM による評価）</p>}
+      {!probabilities && <p className="readout-note">{t.noDistribution}</p>}
     </div>
   );
 }
 
 function ScoreReadout({ answer, question }: { answer: ScoreAnswer; question: Question | undefined }) {
+  const { t } = useI18n();
   const levels =
     question?.type === "score"
       ? question.criteria
@@ -126,7 +135,7 @@ function ScoreReadout({ answer, question }: { answer: ScoreAnswer; question: Que
       <div className="readout-row">
         <p className="readout-figure">
           <span className="num readout-big">{answer.score.toFixed(2)}</span>
-          <span className="readout-caption">0〜{top} のうちの位置</span>
+          <span className="readout-caption">{t.positionOnScale(top)}</span>
         </p>
         <Confidence value={answer.confidence} />
       </div>
@@ -141,7 +150,7 @@ function ScoreReadout({ answer, question }: { answer: ScoreAnswer; question: Que
                   key={level}
                   className="ruler-bar"
                   style={{ left: `${position(level)}%`, height: `${(p / maxP) * 100}%` }}
-                  title={`レベル ${level}: ${formatProbability(p)}`}
+                  title={`${t.level(String(level))}: ${formatProbability(p)}`}
                 >
                   <span className="num ruler-bar-value">{formatProbability(p)}</span>
                 </span>
@@ -165,7 +174,7 @@ function ScoreReadout({ answer, question }: { answer: ScoreAnswer; question: Que
           </li>
         ))}
       </ol>
-      {!probabilities && <p className="readout-note">この答えには確率の分布がありません（LLM による評価）</p>}
+      {!probabilities && <p className="readout-note">{t.noDistribution}</p>}
     </div>
   );
 }
@@ -205,7 +214,7 @@ export function summarizeAnswer(answer: Answer): string {
     case "choice":
       return answer.confidence === undefined
         ? answer.choice
-        : `${answer.choice}（${formatProbability(answer.confidence)}）`;
+        : `${answer.choice} (${formatProbability(answer.confidence)})`;
     case "score":
       return answer.score.toFixed(2);
   }
