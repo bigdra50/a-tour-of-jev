@@ -2,6 +2,8 @@
 
 [日本語](README.ja.md)
 
+![A Tour of Jev: a lesson on the left, and on the right the code with Jev's answer shown as probability bars](docs/screenshot-en.png)
+
 A local, hands-on tutorial for Jev, the System One model from TypeSafe AI.
 As in A Tour of Go, you read a lesson on the left, then edit and run code on the right.
 Answers appear as probability readouts: a scale for Noul, bars for Choice, and a ruler for Score.

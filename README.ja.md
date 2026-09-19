@@ -2,6 +2,8 @@
 
 [English](README.md)
 
+![左にレッスン、右にコードと確率の棒グラフで表した Jev の答えが並ぶ A Tour of Jev の画面](docs/screenshot-ja.png)
+
 TypeSafe の System One モデル Jev を、ブラウザで書いて実行して確かめるローカル教材です。
 A Tour of Go と同じく、左の解説を読み、右のエディタでコードを書き換えて実行します。
 答えは確率の目盛りや分布として表示されます。
