@@ -1,0 +1,1422 @@
+/* A Tour of Jev
+ * 見せ場は答えの計器（目盛り・針・分布）だけにして、ほかは静かな紙面にする。
+ * 色は確率の量を表す石油色（--mass）と、青みのある墨（--ink）が軸。
+ */
+
+:root {
+  color-scheme: light;
+  --paper: #eef2f0;
+  --surface: #ffffff;
+  --surface-2: #f5f8f7;
+  --ink: #16302b;
+  --ink-2: #4e6460;
+  --ink-3: #7a8c88;
+  --rule: #d5dfdb;
+  --rule-strong: #a9bab5;
+  --mass: #0b7a6e;
+  --mass-2: #cfe9e3;
+  --mass-3: #e6f4f1;
+  --mass-ink: #ffffff;
+  --warn: #9a5a06;
+  --error: #b3261e;
+  --error-2: #fbeae8;
+
+  --syntax-keyword: #16302b;
+  --syntax-string: #8a4b08;
+  --syntax-number: #0b7a6e;
+  --syntax-comment: #7a8c88;
+  --syntax-property: #3d5a54;
+  --syntax-function: #16302b;
+
+  --font-sans:
+    "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #0d1917;
+    --surface: #12211e;
+    --surface-2: #172a26;
+    --ink: #e2eeeb;
+    --ink-2: #a8bbb6;
+    --ink-3: #7b908b;
+    --rule: #26403a;
+    --rule-strong: #3d5a53;
+    --mass: #37c4b0;
+    --mass-2: #1d4a42;
+    --mass-3: #16332e;
+    --mass-ink: #04211d;
+    --warn: #e3a646;
+    --error: #f27a70;
+    --error-2: #3a1c1a;
+
+    --syntax-keyword: #e2eeeb;
+    --syntax-string: #e9b27a;
+    --syntax-number: #37c4b0;
+    --syntax-comment: #7b908b;
+    --syntax-property: #b9ccc7;
+    --syntax-function: #e2eeeb;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  height: 100%;
+}
+
+.num,
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--mass);
+  text-underline-offset: 3px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--mass);
+  outline-offset: 2px;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 0 4px;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* ---------- 全体の骨組み ---------- */
+
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 236px minmax(340px, 500px) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.toc-panel,
+.lesson-pane,
+.lab-pane {
+  min-height: 0;
+  overflow: auto;
+}
+
+.toc-panel {
+  border-right: 1px solid var(--rule);
+  background: var(--surface-2);
+}
+
+.lesson-pane {
+  border-right: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.lab-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.toc-toggle,
+.toc-backdrop {
+  display: none;
+}
+
+/* ---------- 上部 ---------- */
+
+.masthead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px 28px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.masthead-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wordmark-jev {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--mass);
+}
+
+.wordmark-tour {
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.masthead-controls {
+  display: flex;
+  gap: 12px;
+}
+
+.control {
+  display: grid;
+  gap: 2px;
+}
+
+.control-label {
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.control select {
+  min-width: 9rem;
+  padding: 4px 26px 4px 8px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a8c88'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  color: var(--ink);
+  font: 500 13px var(--font-sans);
+  appearance: none;
+}
+
+.control select:disabled {
+  color: var(--ink-3);
+}
+
+.session {
+  display: flex;
+  gap: 18px;
+  margin: 0;
+}
+
+.session div {
+  display: grid;
+}
+
+.session dt {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.session dd {
+  margin: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ---------- 目次 ---------- */
+
+.toc {
+  padding: 18px 12px 32px;
+}
+
+.toc-progress {
+  margin: 0 8px 18px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.toc-progress-bar {
+  display: block;
+  height: 3px;
+  margin-top: 6px;
+  background: var(--rule);
+}
+
+.toc-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--mass);
+}
+
+.toc-part + .toc-part {
+  margin-top: 18px;
+}
+
+.toc-part-title {
+  margin: 0 8px 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.toc-link {
+  display: grid;
+  grid-template-columns: 1.8em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 4px;
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  text-decoration: none;
+}
+
+.toc-link:hover {
+  background: var(--mass-3);
+}
+
+.toc-link[aria-current="page"] {
+  background: var(--mass-2);
+  font-weight: 700;
+}
+
+.toc-number {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.toc-check {
+  color: var(--mass);
+  font-size: 13px;
+}
+
+/* ---------- レッスン本文 ---------- */
+
+.lesson {
+  max-width: 40em;
+  padding: 28px 32px 56px;
+}
+
+.lesson-part {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 6px;
+  color: var(--mass);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lesson-count {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+.lesson-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.lesson-done {
+  padding: 1px 8px;
+  border: 1px solid var(--mass);
+  border-radius: 999px;
+  color: var(--mass);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lesson-lead {
+  margin: 0 0 22px;
+  color: var(--ink-2);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.lesson-requires {
+  margin: 0 0 20px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--warn);
+  background: var(--surface-2);
+  font-size: 14px;
+}
+
+.prose {
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.prose > :first-child {
+  margin-top: 0;
+}
+
+.prose p {
+  margin: 0 0 14px;
+}
+
+.prose h2 {
+  margin: 30px 0 10px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.prose ul,
+.prose ol {
+  margin: 0 0 14px;
+  padding-left: 1.4em;
+}
+
+.prose li + li {
+  margin-top: 4px;
+}
+
+.prose code {
+  padding: 1px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--surface-2);
+  font-size: 0.86em;
+}
+
+.prose pre {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  overflow: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.prose pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.prose table {
+  width: 100%;
+  margin: 0 0 16px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.prose th,
+.prose td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose th {
+  border-bottom-color: var(--rule-strong);
+  color: var(--ink-2);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.prose strong {
+  font-weight: 700;
+}
+
+.exercise {
+  margin: 28px 0 0;
+  padding: 16px 18px 12px;
+  border: 1px solid var(--mass-2);
+  border-radius: var(--radius);
+  background: var(--mass-3);
+}
+
+.exercise-pass {
+  border-color: var(--mass);
+}
+
+.exercise-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  color: var(--mass);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.exercise-state {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--mass);
+  color: var(--mass-ink);
+  font-size: 12px;
+}
+
+.exercise-goal p {
+  margin-bottom: 8px;
+}
+
+.exercise-hint {
+  margin: 4px 0 6px;
+  font-size: 14px;
+}
+
+.exercise-hint summary {
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.exercise-feedback {
+  margin: 8px 0 4px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.docs {
+  margin-top: 28px;
+}
+
+.docs-title {
+  margin: 0 0 6px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.docs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+.pager-link {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.pager-link:hover {
+  border-color: var(--mass);
+}
+
+.pager-next {
+  text-align: right;
+}
+
+.pager-label {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.pager-title {
+  font-weight: 700;
+}
+
+/* ---------- 実験台 ---------- */
+
+.lab {
+  display: grid;
+  grid-template-rows: auto minmax(160px, 46%) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.lab-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.lab-hint {
+  margin: 0 0 0 auto;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.button {
+  padding: 6px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: 700 14px var(--font-sans);
+  cursor: pointer;
+}
+
+.button:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.button-run {
+  min-width: 6.5em;
+  border-color: var(--mass);
+  background: var(--mass);
+  color: var(--mass-ink);
+}
+
+.button-run:hover {
+  filter: brightness(1.08);
+}
+
+.button-stop {
+  min-width: 6.5em;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.button-quiet:not(:disabled):hover {
+  border-color: var(--mass);
+}
+
+.lab-editor {
+  min-height: 0;
+  overflow: hidden;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.editor {
+  height: 100%;
+}
+
+.lab-output {
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---------- 出力 ---------- */
+
+.output {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.output-empty {
+  align-content: start;
+  color: var(--ink-3);
+}
+
+.output-empty p {
+  margin: 0;
+}
+
+.output-hint {
+  font-size: 13px;
+}
+
+.log {
+  margin: 0;
+  padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--rule-strong);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.log-warn {
+  border-left-color: var(--warn);
+  color: var(--warn);
+}
+
+.log-error {
+  border-left-color: var(--error);
+  color: var(--error);
+}
+
+.run-status {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.run-error {
+  padding: 10px 14px;
+  border-left: 3px solid var(--error);
+  background: var(--error-2);
+}
+
+.run-error-title {
+  margin: 0 0 4px;
+  color: var(--error);
+  font-weight: 700;
+}
+
+.run-error-message {
+  margin: 0;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+}
+
+.run-stopped {
+  margin: 0;
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.check-label {
+  font-weight: 700;
+}
+
+.check-pass {
+  border-color: var(--mass);
+  background: var(--mass-3);
+}
+
+.check-pass .check-label {
+  color: var(--mass);
+}
+
+/* show() と戻り値 */
+
+.value {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.value-label {
+  margin: 0 0 8px;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.value-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.value-literal {
+  color: var(--ink-2);
+}
+
+.value-json {
+  font-size: 12px;
+}
+
+.value-json-block {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.value-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.value-table th,
+.value-table td {
+  padding: 5px 10px 5px 0;
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+}
+
+.value-table th {
+  border-bottom-color: var(--rule-strong);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.value-table .cell-num {
+  text-align: right;
+}
+
+.value-fields {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.value-field {
+  display: grid;
+  grid-template-columns: minmax(8em, max-content) minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  font-size: 13.5px;
+}
+
+.value-field dt {
+  color: var(--ink-2);
+}
+
+.value-field dd {
+  margin: 0;
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* ---------- 呼び出し ---------- */
+
+.call {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.call-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  padding: 10px 14px 0;
+}
+
+.call-pending .call-head {
+  padding-bottom: 10px;
+}
+
+.call-collapsed > .call-head {
+  padding-bottom: 10px;
+  cursor: pointer;
+}
+
+.call-collapsed[open] > .call-head {
+  padding-bottom: 0;
+}
+
+.call-kind {
+  color: var(--mass);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.call-status {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.call-error {
+  border-color: var(--error);
+}
+
+.call-error .call-status {
+  color: var(--error);
+  font-weight: 700;
+}
+
+.call-error-message {
+  margin: 6px 14px 0;
+}
+
+.call-issues {
+  margin: 6px 14px 0;
+  padding-left: 1.3em;
+  font-size: 13px;
+}
+
+.call-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 2px 14px 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.call-model {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+}
+
+.call-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.call-summary-id {
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.call-summary-ms {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.call-text {
+  margin: 8px 14px 4px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--rule-strong);
+  background: var(--surface-2);
+  white-space: pre-wrap;
+}
+
+.call-note {
+  margin: 6px 14px 0;
+  color: var(--warn);
+  font-size: 13px;
+}
+
+.call-json {
+  margin: 4px 14px 12px;
+  font-size: 13px;
+}
+
+.call-json summary {
+  width: max-content;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.json {
+  margin-top: 8px;
+}
+
+.json-title {
+  margin: 0 0 4px;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.json-body {
+  max-height: 320px;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* ---------- 計器（答え） ---------- */
+
+.call-answers {
+  margin-top: 6px;
+}
+
+.readout {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.readout-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.readout-id {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.readout-type {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.readout-question {
+  margin: 2px 0 8px;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.readout-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+
+.readout-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.readout-big {
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.readout-caption {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.readout-choice-name {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.readout-note {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+/* Noul: 0〜1 の目盛りと針 */
+
+.scale {
+  padding-top: 4px;
+}
+
+.scale-track {
+  position: relative;
+  height: 14px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.scale-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--mass);
+  transition: width 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.scale-tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  height: 5px;
+  background: var(--rule-strong);
+}
+
+.scale-tick-mid {
+  height: 100%;
+  background: var(--ink-3);
+}
+
+.scale-needle {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  transition: left 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.scale-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Choice: 選択肢ごとの確率 */
+
+.confidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.confidence-none {
+  color: var(--ink-3);
+}
+
+.confidence-label {
+  color: var(--ink-3);
+}
+
+.confidence-meter {
+  position: relative;
+  width: 72px;
+  height: 6px;
+  background: var(--rule);
+}
+
+.confidence-meter span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--ink-2);
+}
+
+.bars {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: minmax(6em, 11em) minmax(0, 1fr) 3.2em;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.bar-name {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-chosen .bar-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.bar-track {
+  position: relative;
+  height: 10px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--mass-2);
+  transition: width 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.bar-chosen .bar-fill {
+  background: var(--mass);
+}
+
+.bar-value {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  text-align: right;
+}
+
+.bar-empty {
+  grid-column: 2 / 4;
+  color: var(--mass);
+  font-size: 12px;
+}
+
+/* Score: 定規・分布・期待値 */
+
+.ruler {
+  padding: 0 22px;
+}
+
+.ruler-bars {
+  position: relative;
+  height: 72px;
+  margin-top: 18px;
+}
+
+.ruler-bar {
+  position: absolute;
+  bottom: 0;
+  width: 26px;
+  margin-left: -13px;
+  min-height: 1px;
+  background: var(--mass);
+  transition: height 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.ruler-bar-value {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 2px;
+  color: var(--ink-3);
+  font-size: 11px;
+  transform: translateX(-50%);
+}
+
+.ruler-axis {
+  position: relative;
+  height: 16px;
+  border-top: 1px solid var(--ink-3);
+}
+
+.ruler-tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 6px;
+  background: var(--ink-3);
+}
+
+.ruler-marker {
+  position: absolute;
+  top: 3px;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border-right: 6px solid transparent;
+  border-bottom: 9px solid var(--ink);
+  border-left: 6px solid transparent;
+  transition: left 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.legend {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.legend-item {
+  display: grid;
+  grid-template-columns: 1.6em minmax(0, 1fr);
+  color: var(--ink-3);
+}
+
+.legend-item.legend-near {
+  color: var(--ink);
+}
+
+.legend-index {
+  color: var(--ink-3);
+}
+
+/* ---------- 案内 ---------- */
+
+.notice {
+  margin: 12px 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.notice-error {
+  border-left-color: var(--error);
+}
+
+.notice-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.notice p,
+.notice ol {
+  margin: 4px 0;
+}
+
+.notice ol {
+  padding-left: 1.4em;
+}
+
+/* ---------- 狭い画面 ---------- */
+
+@media (max-width: 1180px) {
+  .workspace {
+    grid-template-columns: minmax(320px, 440px) minmax(0, 1fr);
+  }
+
+  .toc-toggle {
+    display: inline-block;
+    padding: 4px 10px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    font: 700 13px var(--font-sans);
+    cursor: pointer;
+  }
+
+  .toc-panel {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    width: min(300px, 86vw);
+    transform: translateX(-100%);
+    transition: transform 200ms ease-out;
+  }
+
+  .app[data-toc="open"] .toc-panel {
+    transform: none;
+    box-shadow: 0 0 0 1px var(--rule);
+  }
+
+  .app[data-toc="open"] .toc-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    border: 0;
+    background: rgb(0 0 0 / 0.25);
+  }
+}
+
+@media (max-width: 960px) {
+  .masthead {
+    grid-template-columns: 1fr;
+  }
+
+  .masthead-controls {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 860px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lesson-pane,
+  .lab-pane {
+    overflow: visible;
+    border-right: 0;
+  }
+
+  .lesson {
+    padding: 22px 16px 32px;
+  }
+
+  .lab {
+    grid-template-rows: auto 380px auto;
+  }
+
+  .lab-hint {
+    display: none;
+  }
+
+  .session {
+    flex-wrap: wrap;
+  }
+
+  .bar {
+    grid-template-columns: minmax(5em, 8em) minmax(0, 1fr) 3em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: 利用者の「動きを減らす」設定を、個々の transition より確実に優先させる */
+    transition: none !important;
+  }
+}
